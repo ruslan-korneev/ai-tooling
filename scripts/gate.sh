@@ -12,6 +12,7 @@
 #   gate.sh workspace <id>         G3: linked worktree + own branch + pushed + draft PR open
 #   gate.sh committed              after every step: nothing left uncommitted
 #   gate.sh evidence <id>          G5: every VALIDATION.md check has evidence
+#   gate.sh ready <id>             G6: PR out of draft + body states what was NOT verified
 #   gate.sh all <id>               plan + green + evidence
 #
 # Exit 0 = gate passed. Exit 1 = gate failed. Exit 2 = misuse/misconfiguration.
@@ -332,6 +333,44 @@ gate_committed() {
   return 0
 }
 
+# G6 — handing the PR over. A run that leaves the PR in draft is not finished: the operator has to
+# notice, read the artifacts to work out whether it is safe to review, and click the button themselves.
+gate_ready() {
+  local id="$1" fail=0
+  command -v gh >/dev/null 2>&1 || { adw_warn "G6: gh not installed — mark the PR ready for review by hand."; return 0; }
+
+  local pr; pr="$(gh pr view --json isDraft,state,body,number 2>/dev/null)" || pr=""
+  if [[ -z "${pr// }" ]]; then
+    adw_warn "G6 FAILED: no pull request for this branch."; return 1
+  fi
+
+  local is_draft body number
+  is_draft="$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["isDraft"])' 2>/dev/null)"
+  body="$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("body") or "")' 2>/dev/null)"
+  number="$(printf '%s' "$pr" | python3 -c 'import json,sys; print(json.load(sys.stdin)["number"])' 2>/dev/null)"
+
+  if [[ "$is_draft" == "True" || "$is_draft" == "true" ]]; then
+    adw_warn "G6 FAILED: PR #$number is still a draft. Finish the handoff yourself — do not leave it for the operator:"
+    adw_warn "     gh pr ready"
+    fail=1
+  else
+    adw_log "G6: PR #$number is ready for review"
+  fi
+
+  # "Tests are green" is true and nearly useless; what the operator needs is which parts were never run.
+  if ! printf '%s' "$body" | grep -qiE 'not verified|everything in .?VALIDATION\.md.? was run'; then
+    adw_warn "G6 FAILED: the PR body has no \"## Not verified\" section. List every NOT RUN check with its"
+    adw_warn "     reason, acceptance never observed, degraded review diversity and skipped gates — or state"
+    adw_warn "     plainly that everything in VALIDATION.md was run and passed."
+    fail=1
+  else
+    adw_log "G6: PR body reports what was not verified"
+  fi
+
+  (( fail )) || adw_log "G6 OK: PR handed over honestly"
+  return $fail
+}
+
 gate_evidence() {
   local id="$1" val=".tasks/$1/VALIDATION.md" dir=".tasks/$1/evidence"
   [[ -f "$val" ]] || adw_die "no VALIDATION.md for $id"
@@ -355,6 +394,7 @@ case "$cmd" in
   plan)      require_task "${1:-}"; gate_plan "$1" ;;
   workspace) require_task "${1:-}"; gate_workspace "$1" ;;
   committed) gate_committed ;;
+  ready)     require_task "${1:-}"; gate_ready "$1" ;;
   evidence)  require_task "${1:-}"; gate_evidence "$1" ;;
   all)      require_task "${1:-}"; rc=0; gate_plan "$1" || rc=1; gate_green || rc=1; gate_evidence "$1" || rc=1; exit $rc ;;
   ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;

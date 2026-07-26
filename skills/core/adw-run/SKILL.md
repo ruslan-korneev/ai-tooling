@@ -88,7 +88,8 @@ Run every `VALIDATION.md` check, save evidence to `.tasks/<id>/evidence/`.
 Gate: `bash scripts/ai/gate.sh evidence <id>`. Do not open a PR with red or unrun checks.
 
 ### 9 · Review fan-out
-Fill in the PR summary + how-to-verify, `gh pr ready` (it has been a draft since step 5), then
+Fill in the PR summary + how-to-verify (including the "Not verified" section), `gh pr ready`, and confirm
+with `bash scripts/ai/gate.sh ready <id>` — the run marks its own PR ready, not the operator. Then
 `bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <profile>` —
 lens reviewers in parallel, plus a wildcard hunting what those lenses cannot see, plus (on `deep`) a judge
 that dedupes and adversarially verifies. In parallel, run `harness-improver` on the diff + `FRICTION.md`.

@@ -51,7 +51,7 @@ cmd_list() {
   done
   echo
   echo "Gates (scripts/ai/):"
-  echo "  gate.sh    format|static|test|red|green|workspace|committed|groom|plan|evidence|all"
+  echo "  gate.sh    format|static|test|red|green|workspace|committed|groom|plan|evidence|ready|all"
   echo "  guard.sh   builder|test-author|reviewer|planner   (phase file-scope, mechanical)"
   echo "  review.sh  <round> [validation] --profile light|standard|deep   (lens fan-out + judge)"
   echo "  intake.sh  fetch <ref>|writeback <ref> --status|--comment|contract"

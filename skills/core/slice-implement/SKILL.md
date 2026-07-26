@@ -97,7 +97,12 @@ had to do by hand twice. Raw material for `harness-improver`.
 ## 5 · Ready for review + review fan-out
 
 - The PR already exists (opened as a draft in step 0). Now fill in the real summary + how-to-verify citing
-  the evidence, then take it out of draft: `gh pr ready`.
+  the evidence, then hand it over yourself — do not leave the draft mark for the operator to clear:
+
+```bash
+gh pr ready
+bash scripts/ai/gate.sh ready <id>   # PR out of draft + body states what was not verified
+```
 
 **The PR body must state what was NOT verified.** A required section:
 
