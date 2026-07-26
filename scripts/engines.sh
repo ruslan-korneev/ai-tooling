@@ -146,9 +146,68 @@ diversity() {
   else printf 'DEGRADED\n'; fi
 }
 
+# Fan-out reviewers run as separate CLI processes, so their cost never shows up in the launching
+# session's /cost. ADW_USAGE_FILE makes it visible: the engine reports usage, we append one line.
+run_engine_json_usage() { # $1 entry, $2 raw json output → appends "entry<TAB>in<TAB>out<TAB>total"
+  [[ -n "${ADW_USAGE_FILE:-}" ]] || return 0
+  printf '%s' "$2" | python3 -c '
+import json, sys, os
+entry = sys.argv[1]
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    raise SystemExit(0)
+u = d.get("usage") or d.get("modelUsage") or {}
+if isinstance(u, dict) and not any(k in u for k in ("input_tokens", "output_tokens")):
+    for v in u.values():
+        if isinstance(v, dict) and ("input_tokens" in v or "output_tokens" in v):
+            u = v; break
+i = u.get("input_tokens", 0) or 0
+o = u.get("output_tokens", 0) or 0
+c = (u.get("cache_read_input_tokens", 0) or 0) + (u.get("cache_creation_input_tokens", 0) or 0)
+if i or o or c:
+    with open(os.environ["ADW_USAGE_FILE"], "a") as f:
+        f.write("%s\t%d\t%d\t%d\n" % (entry, i, o, c))
+' "$1" 2>/dev/null || true
+}
+
+# Extract the assistant text from a JSON envelope; falls back to the raw body when it is not JSON.
+run_engine_json_text() {
+  python3 -c '
+import json, sys
+raw = sys.stdin.read()
+try:
+    d = json.loads(raw)
+except Exception:
+    print(raw); raise SystemExit(0)
+for k in ("result", "text", "content", "response"):
+    v = d.get(k)
+    if isinstance(v, str) and v.strip():
+        print(v); raise SystemExit(0)
+print(raw)
+' 2>/dev/null
+}
+
 run_engine() { # $1 entry (name[:model]); prompt on stdin
   local entry="$1" bin model prompt
   bin="$(engine_bin "$entry")"; model="$(engine_model "$entry")"; prompt="$(cat)"
+
+  # Claude can report usage as JSON; use it when we are asked to account for cost.
+  if [[ "$bin" == claude && -n "${ADW_USAGE_FILE:-}" ]]; then
+    local raw
+    if [[ -n "$model" ]]; then
+      raw="$(printf '%s' "$prompt" | claude -p --model "$model" --output-format json 2>/dev/null)"
+    else
+      raw="$(printf '%s' "$prompt" | claude -p --output-format json 2>/dev/null)"
+    fi
+    if [[ -n "${raw// }" ]]; then
+      run_engine_json_usage "$entry" "$raw"
+      printf '%s' "$raw" | run_engine_json_text
+      return 0
+    fi
+    adw_warn "json output unavailable for $entry — falling back to plain text (cost not recorded)"
+  fi
+
   case "$bin" in
     codex)
       if [[ -n "$model" ]]; then
