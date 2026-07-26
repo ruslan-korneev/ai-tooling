@@ -172,8 +172,39 @@ gate_workspace() {
     adw_warn "G3: gh not installed — cannot verify the draft PR. Open one by hand or say so in the summary."
   fi
 
-  (( fail )) || adw_log "G3 OK: work is in its own worktree, on its own branch, pushed, with a PR open"
+  # The tracker is where everyone else looks. A ticket still sitting in Todo while a branch, a PR and a
+  # worktree exist means two people can pick up the same work.
+  if [[ "$(adw_cfg INTAKE_WRITEBACK false)" == "true" && -n "$(adw_cfg INTAKE_CMD)" ]]; then
+    local ref want have
+    ref="$(ticket_ref "$id")"
+    # state names contain spaces ("In Progress") — take everything after the arrow, not one field
+    want="$(bash "$(dirname "${BASH_SOURCE[0]}")/intake.sh" states "$ref" 2>/dev/null \
+            | sed -n 's/^ *start *→ *//p' | head -1)"
+    have="$(bash "$(dirname "${BASH_SOURCE[0]}")/intake.sh" fetch "$ref" 2>/dev/null \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null)"
+    if [[ -z "${have// }" ]]; then
+      adw_warn "G3: could not read the ticket state for $ref — move it by hand if it is still open."
+    elif [[ -n "${want// }" && "${have,,}" != "${want,,}" ]]; then
+      adw_warn "G3: ticket $ref is '$have', not '$want'. Move it now so nobody picks up the same work:"
+      adw_warn "     bash scripts/ai/intake.sh writeback $ref --status start"
+      fail=1
+    else
+      adw_log "G3: ticket $ref is '$have'"
+    fi
+  fi
+
+  (( fail )) || adw_log "G3 OK: worktree, own branch, pushed, PR open, ticket moved"
   return $fail
+}
+
+# .tasks/<id> is lowercased; trackers usually key on the original case (smbh-267 → SMBH-267).
+ticket_ref() {
+  local id="$1"
+  if [[ "$id" =~ ^([a-zA-Z]+)-([0-9]+)$ ]]; then
+    printf '%s-%s' "$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:lower:]' '[:upper:]')" "${BASH_REMATCH[2]}"
+  else
+    printf '%s' "$id"
+  fi
 }
 
 # Run after every step. A step that is not committed does not exist: it cannot be reviewed, reverted,

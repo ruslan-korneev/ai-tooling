@@ -52,10 +52,13 @@ git worktree add ../<repo>-<id> -b <id>-<slug> && cd ../<repo>-<id>
 bash scripts/ai/setup-worktree.sh
 git commit --allow-empty -m "<type>(<scope>): start <id>" && git push -u origin HEAD
 gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+bash scripts/ai/intake.sh writeback <REF> --status start   # move the ticket out of the backlog
+bash scripts/ai/gate.sh workspace <id>
 ```
 
 Doing this at the end instead makes the whole run invisible: the operator cannot watch the diff grow, a
-crash loses everything unpushed, and parallel slices collide in one checkout.
+crash loses everything unpushed, parallel slices collide in one checkout, and a ticket still sitting in
+Todo tells the rest of the team the work is unclaimed.
 
 ### 6 · RED (agent: `test-author`)
 Tests first, written by an agent that may not touch source (`guard.sh test-author`). Gate:

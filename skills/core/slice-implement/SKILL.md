@@ -20,6 +20,7 @@ bash scripts/ai/setup-worktree.sh                    # links deps, copies local-
 git commit --allow-empty -m "<type>(<scope>): start <id>"
 git push -u origin HEAD
 gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+bash scripts/ai/intake.sh writeback <REF> --status start   # ticket → in progress (no-op if writeback off)
 bash scripts/ai/gate.sh workspace <id>               # must exit 0 before you continue
 ```
 
@@ -30,6 +31,9 @@ Why each part is non-negotiable:
 - **Draft PR from the start** — the operator can watch the diff grow instead of receiving a wall of code
   at the end. Draft, not ready-for-review: it says "in progress", and it is opened before the code exists
   precisely so nobody has to ask what you are doing.
+- **Ticket moved out of the backlog** — the tracker is where the rest of the team looks. A ticket in Todo
+  while a branch and PR exist invites someone to start the same work. Move it by **intent**
+  (`--status start`), never by a hardcoded state name.
 
 Then re-read `PLAN.md` + `OPEN_QUESTIONS.md` and run `bash scripts/ai/gate.sh plan <id>`. A **new
 blocker** (the plan missed something, a contradiction, a missing contract) → **STOP**: record it as a
@@ -90,6 +94,9 @@ had to do by hand twice. Raw material for `harness-improver`.
 
 - The PR already exists (opened as a draft in step 0). Now fill in the real summary + how-to-verify citing
   the evidence, then take it out of draft: `gh pr ready`.
+- Post the PR link to the tracker: `bash scripts/ai/intake.sh writeback <REF> --comment "PR: <url>"`.
+  That is the **second and last** tracker write of the run — no progress narration in between, and never
+  close the ticket: that is the operator's, like merging.
 - Review goes **only** through `bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <p>`
   — lens reviewers in parallel, a wildcard for what they cannot see, a judge on `deep`. An ad-hoc agent
   review is not a substitute, including in a session that also did the grooming.

@@ -16,6 +16,7 @@ STEP -1 (workspace, BEFORE touching any source file — in this order):
   git commit --allow-empty -m "<type>(<scope>): start <id>"
   git push -u origin HEAD
   gh pr create --draft --title "<id>: <name>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+  bash scripts/ai/intake.sh writeback <REF> --status start   # ticket out of the backlog, by intent
   bash scripts/ai/gate.sh workspace <id>   # must exit 0 before you continue
   Source the env before running anything that binds a port: `set -a; . .tasks/_worktree.env; set +a`.
   Never run a package install through a symlinked dep dir.
@@ -64,7 +65,9 @@ STEP 3 — VALIDATE:
 
 STEP 4 — READY FOR REVIEW (in parallel):
   1. Fill in the PR summary + how-to-verify citing the evidence, then `gh pr ready` (the PR has been
-     a draft since STEP -1).
+     a draft since STEP -1). Post the link to the tracker:
+     `bash scripts/ai/intake.sh writeback <REF> --comment "PR: <url>"` — the second and last tracker
+     write of the run. Never close the ticket; that is the operator's.
   2. bash scripts/ai/review.sh 1 .tasks/<id>/VALIDATION.md --profile <profile>
      Lens reviewers in parallel + a wildcard + (deep) a judge. Findings are posted to the PR.
   3. harness-improver on the diff + .tasks/<id>/FRICTION.md → HARNESS_PROPOSALS.md (proposals only).
