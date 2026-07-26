@@ -67,6 +67,10 @@ detect_stack() {
   local t="$1"
   [[ -f "$t/default.project.json" || -f "$t/wally.toml" ]] && { echo roblox; return; }
   [[ -f "$t/go.mod" ]] && { echo go; return; }
+  # SwiftPM and Xcode need different commands; a Package.swift alongside an .xcodeproj means SwiftPM drives.
+  [[ -f "$t/Package.swift" ]] && { echo swift; return; }
+  compgen -G "$t/*.xcworkspace" >/dev/null 2>&1 && { echo swift-xcode; return; }
+  compgen -G "$t/*.xcodeproj"  >/dev/null 2>&1 && { echo swift-xcode; return; }
   if [[ -f "$t/pyproject.toml" || -f "$t/requirements.txt" || -f "$t/setup.py" ]]; then
     # uv.lock means every tool must run through `uv run` to hit the locked environment
     [[ -f "$t/uv.lock" ]] && { echo python-uv; return; }
@@ -128,9 +132,52 @@ install_rules() {
 }
 
 # Merge our hook into .claude/settings.json without disturbing the user's other settings.
+# Measure what the formatter would do to files it has never touched. Turning a hook on over an
+# unformatted codebase makes the first edit rewrite whole files, burying the actual change.
+format_churn_ratio() { # prints a percentage, or nothing when it cannot tell
+  local fmt="$1" sample tmp total=0 changed=0 f
+  command -v git >/dev/null 2>&1 || return 0
+  sample="$(cd "$TARGET" && git ls-files | grep -E '\.(swift|py|ts|tsx|js|jsx|go|rs|rb|kt|java|lua|luau|sh)$' | head -3)"
+  [[ -n "${sample// }" ]] || return 0
+  tmp="$(mktemp -d)"
+  while IFS= read -r f; do
+    [[ -f "$TARGET/$f" ]] || continue
+    mkdir -p "$tmp/$(dirname "$f")"; cp "$TARGET/$f" "$tmp/$f"
+  done <<< "$sample"
+  ( cd "$tmp" && bash -c "$fmt" >/dev/null 2>&1 ) || { rm -rf "$tmp"; return 0; }
+  while IFS= read -r f; do
+    [[ -f "$tmp/$f" ]] || continue
+    local lines diff_lines
+    lines="$(wc -l < "$TARGET/$f" | tr -d ' ')"
+    diff_lines="$(diff "$TARGET/$f" "$tmp/$f" 2>/dev/null | grep -cE '^[<>]' || true)"
+    total=$(( total + lines )); changed=$(( changed + diff_lines / 2 ))
+  done <<< "$sample"
+  rm -rf "$tmp"
+  (( total > 0 )) && printf '%d' $(( changed * 100 / total ))
+}
+
 install_hooks() {
   local settings="$TARGET/.claude/settings.json" hook_src="$SRC/templates/settings.hooks.json"
   [[ "$DRY_RUN" == 1 ]] && { info "would register on-edit format hook in .claude/settings.json"; return 0; }
+
+  local fmt; fmt="$(sed -n '/^```ini/,/^```/p' "$TARGET/.tasks/_STACK.md" 2>/dev/null \
+                    | grep -m1 -E '^FORMAT_CMD=' | sed -E 's/^FORMAT_CMD=//; s/[[:space:]]+#[[:space:]].*$//; s/[[:space:]]+$//')"
+  if [[ -z "${fmt// }" ]]; then
+    info "hook NOT registered: FORMAT_CMD is empty — an on-edit hook that formats nothing is pure overhead."
+    info "  Fill FORMAT_CMD in .tasks/_STACK.md and re-run install to enable it."
+    return 0
+  fi
+
+  local churn; churn="$(format_churn_ratio "$fmt")"
+  if [[ -n "$churn" ]] && (( churn > 25 )); then
+    info "hook NOT registered: the formatter rewrites ~${churn}% of lines in files it has never touched."
+    info "  Enabling it now would make the first edit to any file a full-file rewrite that buries the real change."
+    info "  Format the repository once in its own commit, then re-run install."
+    return 0
+  fi
+  [[ -n "$churn" ]] && info "formatter churn on untouched files: ~${churn}% — safe to hook"
+
+  command -v python3 >/dev/null 2>&1 || { info "python3 not found — skipping hook registration (add it by hand from templates/settings.hooks.json)"; return 0; }
   command -v python3 >/dev/null 2>&1 || { info "python3 not found — skipping hook registration (add it by hand from templates/settings.hooks.json)"; return 0; }
   mkdir -p "$(dirname "$settings")"
   python3 - "$settings" "$hook_src" <<'PY'
@@ -266,6 +313,21 @@ cmd_install() {
       > "$TARGET/.ai-tooling.json"
   fi
 
+  # Files the installer writes can be silently swallowed by a global gitignore: the .codex copies get
+  # committed, the .claude ones do not, and nobody notices until a fresh clone behaves differently.
+  local ignored=() p
+  for p in .claude .codex scripts/ai .tasks AGENTS.md; do
+    [[ -e "$TARGET/$p" ]] || continue
+    ( cd "$TARGET" && git check-ignore -q "$p" 2>/dev/null ) && ignored+=("$p")
+  done
+  if (( ${#ignored[@]} )); then
+    info ""
+    info "IGNORED BY GIT — these paths were written but git will not see them:"
+    for p in "${ignored[@]}"; do info "    $p   ($(cd "$TARGET" && git check-ignore -v "$p" 2>/dev/null | cut -d: -f1-2))"; done
+    info "  Decide deliberately: commit the harness with 'git add -f <path>', or leave it untracked and"
+    info "  know that a fresh clone of this repo has no harness. Half-tracked is the bad outcome."
+  fi
+
   local cands; cands="$(cd "$TARGET" && bash scripts/ai/engines.sh candidates 2>/dev/null | tr '\n' ' ')"
   cat >&2 <<EOF
 
@@ -305,8 +367,21 @@ cmd_doctor() {
   echo
   local stack="$target/.tasks/_STACK.md"
   if [[ -f "$stack" ]]; then
-    local empty; empty="$(sed -n '/^```ini/,/^```/p' "$stack" | grep -cE '^(LINT|TYPECHECK|TEST|FORMAT)_[A-Z_]*=$' || true)"
-    [[ "${empty:-0}" -gt 0 ]] && echo "  WARN: $empty check-kit command(s) unset in .tasks/_STACK.md — those gates will report SKIPPED"
+    # An empty value with a stated reason is a decision; without one it is an omission. Report them apart.
+    local k v note undecided=0
+    for k in LINT_CMD TYPECHECK_CMD FORMAT_CMD FORMAT_CHECK_CMD TEST_CMD; do
+      local line; line="$(sed -n '/^```ini/,/^```/p' "$stack" | grep -m1 -E "^$k=")" || continue
+      v="$(printf '%s' "$line" | sed -E "s/^$k=//; s/[[:space:]]+#[[:space:]].*$//; s/[[:space:]]+$//")"
+      note="$(printf '%s' "$line" | grep -oE '#[[:space:]].*$' | sed -E 's/^#[[:space:]]*//')"
+      [[ -n "$v" ]] && continue
+      if [[ -n "$note" ]]; then
+        echo "  $k: not set — $note"
+      else
+        echo "  WARN: $k unset with no reason. Either fill it in, or record why: '$k=   # none: <reason>'"
+        undecided=$((undecided+1))
+      fi
+    done
+    (( undecided )) && echo "  ($undecided command(s) unexplained — an unexplained gap is indistinguishable from a forgotten one)"
   else
     echo "  WARN: no .tasks/_STACK.md — gates cannot run"
   fi
@@ -319,7 +394,7 @@ cmd_doctor() {
   cands="$(cd "$target" 2>/dev/null && bash scripts/ai/engines.sh candidates 2>/dev/null | tr '\n' ' ')"
   usable="$(cd "$target" 2>/dev/null && bash scripts/ai/engines.sh list 2>/dev/null | tr '\n' ' ')"
   echo "  engine CLIs on PATH: ${cands:-none}"
-  echo "  declared usable:     ${usable:-none}"
+  echo "  declared in _STACK:  ${usable:-none}   (declared, not re-verified here — 'engines.sh probe' checks)"
   if [[ -f "$stack" ]] && ! grep -qE '^ENGINES=.+' "$stack"; then
     echo "  WARN: ENGINES unset — only the implement engine is assumed usable. Verify with: bash scripts/ai/engines.sh probe --write"
   fi

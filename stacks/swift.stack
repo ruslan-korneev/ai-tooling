@@ -1,0 +1,14 @@
+# Stack profile: Swift package (SwiftPM) — selected when Package.swift is present
+STACK_NAME=Swift (SwiftPM)
+LINT_CMD=
+TYPECHECK_CMD=swift build
+FORMAT_CMD=swift format -i --recursive Sources Tests
+FORMAT_CHECK_CMD=swift format lint --recursive Sources Tests
+TEST_CMD=swift test
+TEST_ONE_CMD=swift test --filter <path>
+BUILD_CMD=swift build -c release
+RUN_CMD=swift run
+DEP_DIRS=.build
+LOCAL_ONLY_FILES=
+BASE_BRANCH=main
+NOTES=`swift build` is the typecheck: there is no separate step. `swift format` ships with the toolchain (Swift 6+); older toolchains need swift-format installed separately, so leave the format commands empty with a reason rather than guessing. SwiftLint is optional and not assumed.

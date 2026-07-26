@@ -20,6 +20,16 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 
 KNOWN_ENGINES="claude codex gemini opencode"
+
+# Model pins tried when a vendor is the only one available. Probed, never assumed.
+default_pins() {
+  case "$1" in
+    claude)   printf 'opus sonnet' ;;
+    codex)    printf 'gpt-5.5 gpt-5.5-codex' ;;
+    gemini)   printf '' ;;
+    opencode) printf '' ;;
+  esac
+}
 PROBE_TIMEOUT="${ADW_PROBE_TIMEOUT:-45}"
 
 candidates() {
@@ -82,6 +92,26 @@ probe() {
     reason="$(probe_one "$e")" && { printf '  %-18s OK\n' "$e" >&2; usable+=("$e"); } \
                                || printf '  %-18s FAIL — %s\n' "$e" "$reason" >&2
   done <<< "$source_list"
+
+  # One vendor answering is not the end of the story: different models of the same vendor have different
+  # blind spots, which is the whole point of a second reviewer. Probe the pins rather than recommending
+  # them in prose and writing the degraded value anyway.
+  local vendors; vendors="$(printf '%s\n' "${usable[@]:-}" | sed 's/:.*//' | sort -u | sed '/^$/d')"
+  if [[ "$(printf '%s\n' "$vendors" | wc -l | tr -d ' ')" == "1" && "${#usable[@]}" == "1" ]]; then
+    local vendor="$vendors" pin
+    for pin in $(default_pins "$vendor"); do
+      reason="$(probe_one "$vendor:$pin")" \
+        && { printf '  %-18s OK\n' "$vendor:$pin" >&2; usable+=("$vendor:$pin"); } \
+        || printf '  %-18s FAIL — %s\n' "$vendor:$pin" "$reason" >&2
+    done
+    # keep only the pinned entries when at least two answered: they are strictly more informative
+    local pinned=(); local e
+    for e in "${usable[@]}"; do [[ "$e" == *:* ]] && pinned+=("$e"); done
+    if (( ${#pinned[@]} >= 2 )); then
+      usable=("${pinned[@]}")
+      adw_log "single vendor → pinned models probed and recorded (CROSS-MODEL, not DEGRADED)"
+    fi
+  fi
 
   if (( ${#usable[@]} == 0 )); then
     adw_warn "no usable engine. Reviews cannot run until at least one CLI is authenticated."

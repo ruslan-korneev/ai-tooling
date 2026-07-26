@@ -68,4 +68,18 @@ done
 
 bash "$here/worktree-alloc.sh" >/dev/null
 
+# Generated artifacts (bindings, codegen, protobufs) must be REGENERATED, never copied: a stale copy is
+# a silently wrong build rather than an error. The same command is what makes a fresh clone buildable.
+bootstrap="$(adw_cfg BOOTSTRAP_CMD)"
+if [[ -n "${bootstrap// }" ]]; then
+  adw_log "bootstrap: $bootstrap"
+  if ! bash -c "$bootstrap"; then
+    adw_warn "BOOTSTRAP_CMD failed — this worktree is not buildable yet. Fix it before running any gate."
+    exit 1
+  fi
+else
+  adw_log "no BOOTSTRAP_CMD configured. If this project has generated artifacts (bindings, codegen), set it"
+  adw_log "  — copying them via LOCAL_ONLY_FILES ships a stale artifact, which fails silently, not loudly."
+fi
+
 adw_log "done. Next: source .tasks/_worktree.env, then 'bash scripts/ai/gate.sh static' to confirm."

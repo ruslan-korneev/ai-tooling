@@ -5,14 +5,27 @@
 adw_repo_root() { git rev-parse --show-toplevel 2>/dev/null; }
 
 # adw_cfg <KEY> [default] — read KEY from any ```ini block in .tasks/_STACK.md.
+# A trailing " # reason" is a note, not part of the command: an empty value with a stated reason
+# ("# none: no linter in this toolchain") is a decision; an empty value with no reason is an omission,
+# and the two must not look alike in a report.
 adw_cfg() {
   local key="$1" default="${2:-}" root value
   root="$(adw_repo_root)" || { printf '%s' "$default"; return 0; }
   [[ -f "$root/.tasks/_STACK.md" ]] || { printf '%s' "$default"; return 0; }
   value="$(sed -n '/^```ini/,/^```/p' "$root/.tasks/_STACK.md" \
-    | grep -m1 -E "^${key}=" | sed -E "s/^${key}=//" | sed -E 's/[[:space:]]+$//')"
+    | grep -m1 -E "^${key}=" | sed -E "s/^${key}=//" | sed -E 's/[[:space:]]+#[[:space:]].*$//' \
+    | sed -E 's/[[:space:]]+$//')"
   [[ -n "$value" ]] || value="$default"
   printf '%s' "$value"
+}
+
+# adw_cfg_note <KEY> — the "# …" note attached to a key, if any. Empty when there is none.
+adw_cfg_note() {
+  local key="$1" root
+  root="$(adw_repo_root)" || return 0
+  [[ -f "$root/.tasks/_STACK.md" ]] || return 0
+  sed -n '/^```ini/,/^```/p' "$root/.tasks/_STACK.md" \
+    | grep -m1 -E "^${key}=" | grep -oE '#[[:space:]].*$' | sed -E 's/^#[[:space:]]*//'
 }
 
 adw_log()  { printf '[adw] %s\n' "$*" >&2; }
