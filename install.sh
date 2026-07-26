@@ -14,7 +14,9 @@
 #   --no-scripts          skip scripts/ai/
 #   --no-hooks            do NOT register the on-edit format hook in .claude/settings.json
 #   --no-rules            skip the AGENTS.md section
-#   --force               overwrite files that exist and differ (incl. locally edited copies)
+#   --force               overwrite generated copies that exist and differ (skills/agents/scripts)
+#   --regen-stack         overwrite .tasks/_STACK.md from the profile (backs the old one up first);
+#                         --force alone never touches it — it holds config only you can reproduce
 #   --dry-run             print what would happen, change nothing
 #
 # The core (skills/agents/scripts) is identical in every project. Everything project-specific lives in
@@ -48,7 +50,7 @@ cmd_list() {
   done
   echo
   echo "Gates (scripts/ai/):"
-  echo "  gate.sh    format|static|test|red|green|groom|plan|evidence|all"
+  echo "  gate.sh    format|static|test|red|green|workspace|committed|groom|plan|evidence|all"
   echo "  guard.sh   builder|test-author|reviewer|planner   (phase file-scope, mechanical)"
   echo "  review.sh  <round> [validation] --profile light|standard|deep   (lens fan-out + judge)"
   echo "  intake.sh  fetch <ref>|writeback <ref> --status|--comment|contract"
@@ -90,8 +92,15 @@ seed_file() {
 render_stack_md() {
   local profile="$SRC/stacks/$STACK.stack" out="$TARGET/.tasks/_STACK.md"
   [[ -f "$profile" ]] || die "unknown stack '$STACK' (have: $(all_stacks | tr '\n' ' '))"
-  if [[ -f "$out" && "$FORCE" != 1 ]]; then
-    info "keep existing: .tasks/_STACK.md (project-owned; --force to regenerate)"; return 0
+  # NOT covered by --force: this file is the project's own configuration — commands, engines, intake,
+  # shared resources. Regenerating it silently discards work that only the operator can reproduce.
+  if [[ -f "$out" && "$REGEN_STACK" != 1 ]]; then
+    info "keep existing: .tasks/_STACK.md (project-owned; --regen-stack to overwrite)"; return 0
+  fi
+  if [[ -f "$out" && "$REGEN_STACK" == 1 ]]; then
+    local backup="$out.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+    [[ "$DRY_RUN" == 1 ]] || cp "$out" "$backup"
+    info "backed up existing config → ${backup#$TARGET/}"
   fi
   local body; body="$(cat "$SRC/templates/_STACK.md.tmpl")"
   while IFS='=' read -r key value; do
@@ -182,7 +191,7 @@ cmd_install() {
   TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || die "no such directory"
 
   STACK=""; SKILLS=""; TOOLS="claude,codex"
-  WITH_AGENTS=1; WITH_SCRIPTS=1; WITH_RULES=1; WITH_HOOKS=1; FORCE=0; DRY_RUN=0
+  WITH_AGENTS=1; WITH_SCRIPTS=1; WITH_RULES=1; WITH_HOOKS=1; FORCE=0; DRY_RUN=0; REGEN_STACK=0
 
   while (( $# )); do
     case "$1" in
@@ -194,6 +203,7 @@ cmd_install() {
       --no-hooks) WITH_HOOKS=0; shift ;;
       --no-rules) WITH_RULES=0; shift ;;
       --force) FORCE=1; shift ;;
+      --regen-stack) REGEN_STACK=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
       *) die "unknown option: $1" ;;
     esac
@@ -238,8 +248,8 @@ cmd_install() {
   fi
 
   render_stack_md
-  seed_file "$SRC/templates/_dev-prompt-template.md" "$TARGET/.tasks/_dev-prompt-template.md"
-  seed_file "$SRC/templates/GROOM_LOG.md" "$TARGET/.tasks/_templates/GROOM_LOG.md"
+  copy_file "$SRC/templates/_dev-prompt-template.md" "$TARGET/.tasks/_dev-prompt-template.md"
+  copy_file "$SRC/templates/GROOM_LOG.md" "$TARGET/.tasks/_templates/GROOM_LOG.md"
   seed_file "$SRC/templates/PROPOSALS.md" "$TARGET/.tasks/_harness/PROPOSALS.md"
   seed_file "$SRC/templates/BOARD.md" "$TARGET/.tasks/_orchestration/BOARD.md"
 
