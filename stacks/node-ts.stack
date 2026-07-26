@@ -1,0 +1,14 @@
+# Stack profile: Node + TypeScript
+STACK_NAME=Node + TypeScript
+LINT_CMD=npm run lint
+TYPECHECK_CMD=npx tsc --noEmit
+FORMAT_CMD=npx prettier --write
+FORMAT_CHECK_CMD=npx prettier --check .
+TEST_CMD=npm test
+TEST_ONE_CMD=npx vitest run <path>
+BUILD_CMD=npm run build
+RUN_CMD=npm run dev
+DEP_DIRS=node_modules
+LOCAL_ONLY_FILES=.env.local
+BASE_BRANCH=main
+NOTES=Strict TS. No `any` at module boundaries. Validate every external input at the edge (zod/valibot or equivalent).

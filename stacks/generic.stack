@@ -1,0 +1,14 @@
+# Stack profile: generic (fill in by hand after install)
+STACK_NAME=Generic
+LINT_CMD=
+TYPECHECK_CMD=
+FORMAT_CMD=
+FORMAT_CHECK_CMD=
+TEST_CMD=
+TEST_ONE_CMD=
+BUILD_CMD=
+RUN_CMD=
+DEP_DIRS=
+LOCAL_ONLY_FILES=
+BASE_BRANCH=main
+NOTES=Fill the commands in .tasks/_STACK.md before grooming a slice — validation checks must be runnable.

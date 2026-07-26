@@ -1,0 +1,14 @@
+# Stack profile: Go
+STACK_NAME=Go
+LINT_CMD=golangci-lint run
+TYPECHECK_CMD=go vet ./...
+FORMAT_CMD=gofmt -w .
+FORMAT_CHECK_CMD=gofmt -l .
+TEST_CMD=go test ./...
+TEST_ONE_CMD=go test ./<pkg> -run <Name>
+BUILD_CMD=go build ./...
+RUN_CMD=go run ./cmd/<app>
+DEP_DIRS=
+LOCAL_ONLY_FILES=.env
+BASE_BRANCH=main
+NOTES=gofmt -l must print nothing. Errors wrapped with context; no naked panics in library code.

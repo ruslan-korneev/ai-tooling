@@ -1,0 +1,14 @@
+# Stack profile: Roblox (Rojo + Luau + TestEZ)
+STACK_NAME=Roblox (Rojo + Luau)
+LINT_CMD=npm run lint
+TYPECHECK_CMD=npm run typecheck
+FORMAT_CMD=npm run format
+FORMAT_CHECK_CMD=npm run format:check
+TEST_CMD=TestEZ via Studio MCP (see the roblox-testez-runner skill)
+TEST_ONE_CMD=TestEZ single spec via Studio MCP
+BUILD_CMD=rojo build default.project.json -o build.rbxl
+RUN_CMD=rojo serve default.project.json
+DEP_DIRS=node_modules Packages DevPackages ServerPackages
+LOCAL_ONLY_FILES=.luaurc sourcemap.json
+BASE_BRANCH=main
+NOTES=Studio is a shared operator-owned resource — serve-and-ask, never self-launch or kill it. Studio MCP: read on demand, write on approval. Server authority for damage/rewards/currency/inventory/purchases/progression/persistence.
