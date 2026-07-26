@@ -1,0 +1,14 @@
+# Stack profile: Python managed by uv (selected automatically when uv.lock is present)
+STACK_NAME=Python (uv)
+LINT_CMD=uv run ruff check .
+TYPECHECK_CMD=uv run mypy .
+FORMAT_CMD=uv run ruff format .
+FORMAT_CHECK_CMD=uv run ruff format --check .
+TEST_CMD=uv run pytest -q
+TEST_ONE_CMD=uv run pytest -q <path>
+BUILD_CMD=
+RUN_CMD=
+DEP_DIRS=.venv
+LOCAL_ONLY_FILES=.env
+BASE_BRANCH=main
+NOTES=Every tool runs through `uv run` so it resolves against the locked environment, not whatever happens to be on PATH. Commit the lock file. Do not `pip install` into the venv by hand — add the dependency and re-lock, or the next `uv run` silently drops it.

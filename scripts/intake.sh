@@ -107,6 +107,97 @@ PY
 
 normalize_json() { python3 -c "$NORMALIZE_PY"; }  # stdin: raw output → stdout: contract JSON, or exit 4
 
+# Workflow states differ per team and per tracker: "In Progress", "Doing", "Начали". The core knows
+# INTENTS (start / review / done) and resolves them from the tracker's own state list, so nobody has to
+# hardcode a name that is only true in one workspace.
+read -r -d '' STATES_PY <<'PY'
+import json, re, sys
+
+intent = sys.argv[1]
+team_hint = (sys.argv[2] if len(sys.argv) > 2 else "").upper()
+
+try:
+    doc = json.loads(sys.stdin.read())
+except Exception:
+    sys.stderr.write("[adw] states: output is not JSON\n"); sys.exit(4)
+
+states = []
+def walk(node):
+    if isinstance(node, dict):
+        if "name" in node and "type" in node and isinstance(node.get("name"), str):
+            states.append(node)
+        for v in node.values():
+            walk(v)
+    elif isinstance(node, list):
+        for v in node:
+            walk(v)
+walk(doc)
+
+if not states:
+    sys.stderr.write("[adw] states: no objects with name+type found\n"); sys.exit(4)
+
+def team_key(s):
+    t = s.get("team")
+    if isinstance(t, dict):
+        return str(t.get("key") or t.get("name") or "").upper()
+    return ""
+
+# A workspace-wide listing returns every team's states; keep only the ticket's team when we can tell.
+if team_hint and any(team_key(s) for s in states):
+    scoped = [s for s in states if team_key(s) == team_hint]
+    if scoped:
+        states = scoped
+
+def pos(s):
+    try:
+        return float(s.get("position", 1e9))
+    except (TypeError, ValueError):
+        return 1e9
+
+def by_type(*types):
+    return sorted([s for s in states if str(s.get("type", "")).lower() in types], key=pos)
+
+if intent == "start":
+    # earliest in-progress state; a review column sits later in the workflow
+    pool = [s for s in by_type("started") if not re.search(r"review|test|qa", s["name"], re.I)]
+    pool = pool or by_type("started")
+elif intent == "review":
+    pool = [s for s in by_type("started") if re.search(r"review", s["name"], re.I)]
+    pool = pool or by_type("started")[1:] or by_type("started")
+elif intent == "done":
+    pool = by_type("completed")
+else:
+    sys.stderr.write("[adw] states: unknown intent %r (start|review|done)\n" % intent); sys.exit(2)
+
+if not pool:
+    sys.stderr.write("[adw] states: no state matches intent %r. Available: %s\n"
+                     % (intent, ", ".join("%s (%s)" % (s["name"], s.get("type")) for s in states)))
+    sys.exit(1)
+
+print(pool[0]["name"])
+PY
+
+# resolve_state <intent> [ref] — intent → the tracker's own state name. Echoes the intent back
+# unchanged when no INTAKE_STATES_CMD is configured, so a literal name still works.
+resolve_state() {
+  local intent="$1" ref="${2:-}" cmd out name
+  cmd="$(adw_cfg INTAKE_STATES_CMD)"
+  if [[ -z "${cmd// }" ]]; then printf '%s' "$intent"; return 0; fi
+  out="$(bash -c "${cmd//<ref>/$ref}" 2>/dev/null)" || out=""
+  if [[ -z "${out// }" ]]; then
+    adw_warn "INTAKE_STATES_CMD produced nothing — using '$intent' literally"
+    printf '%s' "$intent"; return 0
+  fi
+  # Team hint from the ticket key (SMBH-267 → SMBH) so a workspace-wide listing narrows correctly.
+  local hint="${ref%%-*}"
+  if name="$(printf '%s' "$out" | python3 -c "$STATES_PY" "$intent" "$hint" 2>/dev/null)"; then
+    printf '%s' "$name"
+  else
+    adw_warn "could not resolve intent '$intent' from the tracker's states — using it literally"
+    printf '%s' "$intent"
+  fi
+}
+
 fetch() {
   local ref="${1:-}"
   [[ -n "$ref" ]] || adw_die "usage: intake.sh fetch <ref>"
@@ -165,6 +256,17 @@ writeback() {
   esac
   [[ -n "$value" ]] || adw_die "empty $kind"
 
+  # A status may be given as an INTENT (start / review / done) — resolved against the tracker's own
+  # workflow states — or as a literal name. Intents keep the loop portable across teams and trackers.
+  if [[ "$kind" == status ]]; then
+    case "$value" in
+      start|review|done)
+        local resolved_name; resolved_name="$(resolve_state "$value" "$ref")"
+        [[ "$resolved_name" != "$value" ]] && adw_log "intent '$value' → state '$resolved_name'"
+        value="$resolved_name" ;;
+    esac
+  fi
+
   local tmpl
   case "$kind" in
     status)  tmpl="$(adw_cfg INTAKE_STATUS_CMD)" ;;
@@ -178,9 +280,19 @@ writeback() {
   bash -c "$resolved" || adw_warn "writeback failed — the run continues; the tracker is not the source of truth for engineering state."
 }
 
+states() { # show how intents resolve against this tracker — diagnostic, writes nothing
+  local ref="${1:-}"
+  [[ -n "$(adw_cfg INTAKE_STATES_CMD)" ]] || adw_die "no INTAKE_STATES_CMD in .tasks/_STACK.md"
+  local intent
+  for intent in start review done; do
+    printf '  %-8s → %s\n' "$intent" "$(resolve_state "$intent" "$ref")"
+  done
+}
+
 case "${1:-}" in
   fetch)     shift; fetch "$@" ;;
   writeback) shift; writeback "$@" ;;
+  states)    shift; states "$@" ;;
   contract)  print_contract ;;
-  *) adw_die "usage: intake.sh fetch <ref> | writeback <ref> --status|--comment <v> | contract" ;;
+  *) adw_die "usage: intake.sh fetch <ref> | writeback <ref> --status|--comment <v> | states [ref] | contract" ;;
 esac

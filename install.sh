@@ -62,7 +62,11 @@ detect_stack() {
   local t="$1"
   [[ -f "$t/default.project.json" || -f "$t/wally.toml" ]] && { echo roblox; return; }
   [[ -f "$t/go.mod" ]] && { echo go; return; }
-  [[ -f "$t/pyproject.toml" || -f "$t/requirements.txt" || -f "$t/setup.py" ]] && { echo python; return; }
+  if [[ -f "$t/pyproject.toml" || -f "$t/requirements.txt" || -f "$t/setup.py" ]]; then
+    # uv.lock means every tool must run through `uv run` to hit the locked environment
+    [[ -f "$t/uv.lock" ]] && { echo python-uv; return; }
+    echo python; return
+  fi
   [[ -f "$t/package.json" ]] && { echo node-ts; return; }
   echo generic
 }

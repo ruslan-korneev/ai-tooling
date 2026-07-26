@@ -123,9 +123,23 @@ INTAKE=manual
 INTAKE_CMD=
 INTAKE_SKILL=
 INTAKE_WRITEBACK=false
+INTAKE_STATES_CMD=
 INTAKE_STATUS_CMD=
 INTAKE_COMMENT_CMD=
 ```
+
+Status names differ per team and per tracker ("In Progress", "Doing", "Начали"), so the loop moves tickets
+by **intent**, not by name:
+
+```bash
+bash scripts/ai/intake.sh states SM-12                  # show how intents resolve here
+bash scripts/ai/intake.sh writeback SM-12 --status start
+```
+
+`INTAKE_STATES_CMD` prints the tracker's workflow states as JSON; the core reads each state's `type`
+(`started` / `completed` / …) and picks: `start` → the earliest in-progress state, `review` → the review
+column, `done` → a completed state. A workspace-wide listing is narrowed to the ticket's own team using
+the key prefix. Leave `INTAKE_STATES_CMD` empty and `--status "Some Name"` is passed through literally.
 
 `bash scripts/ai/intake.sh fetch <ref>` runs `INTAKE_CMD`, maps common JSON field names to the contract,
 and writes the body to `.tasks/<id>/extra_context/ticket.md`. Output it cannot map → it hands the raw text

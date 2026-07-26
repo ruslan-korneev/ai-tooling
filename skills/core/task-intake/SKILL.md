@@ -89,9 +89,17 @@ Closing the ticket is a human decision, like merging. Commands come from `INTAKE
 `INTAKE_COMMENT_CMD`, so the core still knows no tracker:
 
 ```bash
-bash scripts/ai/intake.sh writeback <ref> --status "In Progress"
+bash scripts/ai/intake.sh writeback <ref> --status start      # intent, not a name
 bash scripts/ai/intake.sh writeback <ref> --comment "PR: <url>"
 ```
+
+**Move tickets by intent, never by a hardcoded name.** "In Progress" is true in one team and wrong in the
+next; a status write that silently fails leaves the board lying to everyone reading it. `start` / `review`
+/ `done` are resolved against the tracker's own workflow states (via `INTAKE_STATES_CMD`, reading each
+state's `type`). Check how they resolve in this project with `bash scripts/ai/intake.sh states <ref>`.
+
+`done` exists for completeness but the loop never sets it: closing a ticket is a human decision, like
+merging.
 
 ## Ownership (do not duplicate state)
 
