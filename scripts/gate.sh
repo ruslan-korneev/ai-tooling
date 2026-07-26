@@ -172,6 +172,24 @@ gate_workspace() {
     adw_warn "G3: gh not installed — cannot verify the draft PR. Open one by hand or say so in the summary."
   fi
 
+  # The plan is the first commit on the branch. A reviewer who sees code before the reasoning cannot tell
+  # a deliberate design from an accident, and an uncommitted .tasks/ dies with the session that wrote it.
+  local task_dirty
+  task_dirty="$(git status --porcelain ".tasks/$id" 2>/dev/null | grep -v '_worktree.env' || true)"
+  if [[ -n "${task_dirty// }" ]]; then
+    adw_warn "G3: .tasks/$id is not committed — the plan is the FIRST commit on this branch, before any code:"
+    adw_warn "     git add .tasks/$id && git commit -m \"docs(tasks): plan $id\" && git push"
+    printf '%s\n' "$task_dirty" | head -10 >&2
+    fail=1
+  else
+    adw_log "G3: .tasks/$id committed"
+  fi
+
+  # The harness itself is the operator's to commit, so this is a note rather than a failure.
+  local harness_dirty
+  harness_dirty="$(git status --porcelain scripts/ai .claude/skills .claude/agents .tasks/_STACK.md 2>/dev/null | head -3 || true)"
+  [[ -n "${harness_dirty// }" ]] && adw_warn "G3: harness files are uncommitted (scripts/ai, .claude, _STACK.md) — ask the operator whether to include them."
+
   # The tracker is where everyone else looks. A ticket still sitting in Todo while a branch, a PR and a
   # worktree exist means two people can pick up the same work.
   if [[ "$(adw_cfg INTAKE_WRITEBACK false)" == "true" && -n "$(adw_cfg INTAKE_CMD)" ]]; then

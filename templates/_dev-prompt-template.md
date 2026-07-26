@@ -11,9 +11,11 @@ Profile: <light|standard|deep>.
 BRANCH: <id>-<slug>   (worktree: yes)
 
 STEP -1 (workspace, BEFORE touching any source file — in this order):
-  git worktree add ../<repo>-<id> -b <id>-<slug> && cd ../<repo>-<id>
+  git worktree add ../<repo>-<id> -b <id>-<slug>
+  mv .tasks/<id> ../<repo>-<id>/.tasks/<id>   # if grooming left the artifacts in the primary checkout
+  cd ../<repo>-<id>
   bash scripts/ai/setup-worktree.sh        # links deps, copies local-only config, allocates ports/schema
-  git commit --allow-empty -m "<type>(<scope>): start <id>"
+  git add .tasks/<id> && git commit -m "docs(tasks): plan <id>"   # the plan is the FIRST commit
   git push -u origin HEAD
   gh pr create --draft --title "<id>: <name>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
   bash scripts/ai/intake.sh writeback <REF> --status start   # ticket out of the backlog, by intent

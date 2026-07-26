@@ -15,9 +15,10 @@ pile of changes nobody can see, review, or recover.
 
 ```bash
 git worktree add ../<repo>-<id> -b <id>-<slug>      # never the operator's checkout, never the base branch
+mv .tasks/<id> ../<repo>-<id>/.tasks/<id>            # only if grooming left it in the primary checkout
 cd ../<repo>-<id>
 bash scripts/ai/setup-worktree.sh                    # links deps, copies local-only config, allocates ports
-git commit --allow-empty -m "<type>(<scope>): start <id>"
+git add .tasks/<id> && git commit -m "docs(tasks): plan <id>"   # the plan is the FIRST commit
 git push -u origin HEAD
 gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
 bash scripts/ai/intake.sh writeback <REF> --status start   # ticket → in progress (no-op if writeback off)
@@ -31,6 +32,9 @@ Why each part is non-negotiable:
 - **Draft PR from the start** — the operator can watch the diff grow instead of receiving a wall of code
   at the end. Draft, not ready-for-review: it says "in progress", and it is opened before the code exists
   precisely so nobody has to ask what you are doing.
+- **Plan committed first** — `.tasks/<id>/` is the first commit on the branch, before any code. It is
+  committed, never gitignored: a reviewer reads the reasoning before the diff, and grooming survives a
+  dead session. Artifacts follow the branch, so move them out of the operator's checkout into the worktree.
 - **Ticket moved out of the backlog** — the tracker is where the rest of the team looks. A ticket in Todo
   while a branch and PR exist invites someone to start the same work. Move it by **intent**
   (`--status start`), never by a hardcoded state name.

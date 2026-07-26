@@ -47,14 +47,22 @@ profile, and the estimated tier count. Wait. Fold their corrections back into th
 Worktree, branch, empty start commit, push, **draft PR** — in that order, before a single source file is
 touched. Then `bash scripts/ai/gate.sh workspace <id>` must exit 0.
 
+Grooming happened in the operator's checkout, so `.tasks/<id>/` is sitting there untracked. Move it into
+the worktree and make it the **first commit on the branch** — the plan lands before the code it explains.
+
 ```bash
-git worktree add ../<repo>-<id> -b <id>-<slug> && cd ../<repo>-<id>
-bash scripts/ai/setup-worktree.sh
-git commit --allow-empty -m "<type>(<scope>): start <id>" && git push -u origin HEAD
+git worktree add ../<repo>-<id> -b <id>-<slug>
+mv .tasks/<id> ../<repo>-<id>/.tasks/<id>          # artifacts follow the branch, not the checkout
+cd ../<repo>-<id> && bash scripts/ai/setup-worktree.sh
+git add .tasks/<id> && git commit -m "docs(tasks): plan <id>"
+git push -u origin HEAD
 gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
 bash scripts/ai/intake.sh writeback <REF> --status start   # move the ticket out of the backlog
 bash scripts/ai/gate.sh workspace <id>
 ```
+
+`.tasks/` is committed, never gitignored: it is the provenance record. A reviewer opening the PR reads the
+plan first and the diff second; a session that dies after grooming leaves the work recoverable.
 
 Doing this at the end instead makes the whole run invisible: the operator cannot watch the diff grow, a
 crash loses everything unpushed, parallel slices collide in one checkout, and a ticket still sitting in

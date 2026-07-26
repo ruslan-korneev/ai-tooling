@@ -31,9 +31,11 @@ bash scripts/ai/guard.sh builder        # the implementer may not edit tests
 bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile deep
 ```
 
-**Implementation starts by creating the workspace, not by writing code**: worktree → branch → empty start
-commit → push → **draft PR** → `gate.sh workspace`. Then commit and push **after every step**. Work that
-is uncommitted or unpushed is invisible to the operator, unreviewable in pieces, and lost if the run dies.
+**Implementation starts by creating the workspace, not by writing code**: worktree → branch → **commit
+`.tasks/<id>/` as the first commit** → push → **draft PR** → move the ticket to in-progress →
+`gate.sh workspace`. Then commit and push **after every step**. Work that is uncommitted or unpushed is
+invisible to the operator, unreviewable in pieces, and lost if the run dies; a plan that never lands in
+git leaves a diff nobody can judge.
 
 Never declare a phase done without the gate's exit code. An on-edit hook runs the formatter after every
 `Edit`/`Write`; instructions are advisory, hooks are not.
