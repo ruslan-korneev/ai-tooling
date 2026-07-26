@@ -40,9 +40,10 @@ tracking. Don't manufacture files that carry no information.
   task must respect.
 - **Stack profile:** `.tasks/_STACK.md` — the concrete check kit (lint / typecheck / test / format /
   build / run commands) and stack conventions. Every validation check must be expressible with it.
-- **Product canon** — wherever this project keeps it (a wiki repo, `docs/product/`, Linear/Notion, a
-  PRD in `extra_context/`). If it lives in a sibling repo, read it by **absolute path** — cross-repo
-  `[[wikilinks]]` do not resolve. Record the path in `PLAN.md` provenance.
+- **Product canon** — wherever *this* project keeps it, as recorded in `.tasks/_STACK.md` § Product canon
+  (a wiki repo, `docs/product/`, a tracker, a PRD in `extra_context/`). Not recorded → ask; do not go
+  hunting in tools this project never declared. If canon lives in a sibling repo, read it by **absolute
+  path** — cross-repo `[[wikilinks]]` do not resolve. Record the path in `PLAN.md` provenance.
 - **Implementation repo:** the modules the task touches, plus `docs/`, tests, and config. Note
   analogous existing code to reuse.
 - **Open issues** (`gh issue list --state open`, or the project's tracker): known constraints, deferred

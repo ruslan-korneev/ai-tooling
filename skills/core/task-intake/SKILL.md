@@ -22,18 +22,46 @@ sentence the operator typed.
 Five fields. Epics, sprints, points, custom fields — not the core's business. A tracker that cannot
 produce these five is not a tracker for this purpose; use manual intake.
 
+## The tracker is declared, never inferred
+
+`.tasks/_STACK.md` is the **only** statement of which tracker this project uses. Nothing else counts:
+
+- **A tracker CLI installed on the machine is not evidence.** Your tools are global; projects are not.
+- **Another repo's tracker is not evidence.** Habit from a previous session is exactly the failure mode
+  this rule exists to stop.
+- **A skill you know how to use is not evidence.** Knowing `some-tracker-cli` says nothing about whether
+  *this* project files tickets there.
+- **An issue-shaped key in the request (`ABC-12`) is not evidence** of which system it belongs to.
+
+Empty `INTAKE_CMD` → **manual intake**. It does not mean "go find a tracker". Ask the operator.
+
+Why the rule is strict: a misfiled ticket does not fail loudly. It succeeds, in the wrong workspace, and
+stays wrong until a human reads a backlog that makes no sense. The same applies to writeback — moving a
+ticket in someone else's project is worse than doing nothing.
+
+If the operator names a tracker that `_STACK.md` does not mention, that is a **config change to propose**,
+not an assumption to act on: show them the line to add, and offer manual intake for the current run.
+
 ## Three levels of support — pick the lowest one that works
 
 **Level 0 · manual.** `INTAKE=manual` (or no `INTAKE_CMD`). The operator pastes the ticket; you normalize
 it. Always available, zero configuration, works with a tracker that has no API at all.
 
-**Level 1 · your existing command.** Whatever you already use is first-class — your own CLI, `gh`, `jira`,
-`curl` against an API. It is configured as a template in `.tasks/_STACK.md`:
+**Level 1 · the command this project declares.** Whatever the project already uses is first-class — an
+in-house CLI, `gh`, `jira`, `curl` against an API. It is a template in `.tasks/_STACK.md`, filled in by
+the operator, never guessed:
 
 ```ini
-INTAKE_CMD=linear-kit issue show <ref> --json
-INTAKE_SKILL=linear-tasks
+INTAKE=<tracker-name>
+INTAKE_CMD=<your-cli> issue show <ref> --json
+INTAKE_SKILL=<skill that knows this CLI, if any>
+INTAKE_STATUS_CMD=<your-cli> issue update <ref> --state "<value>"
+INTAKE_COMMENT_CMD=<your-cli> issue comment <ref> --message "<value>"
 ```
+
+Concrete shapes, for the operator to adapt when they set a project up:
+`gh issue view <ref> --json number,title,body,url,state` · `jira issue view <ref> --raw` · any command
+printing JSON with recognizable field names.
 
 `bash scripts/ai/intake.sh fetch <ref>` substitutes `<ref>`, runs it, maps the usual JSON field names to
 the contract, and writes the body to disk. Output it cannot map → it exits 4 and hands you the raw text;
@@ -99,7 +127,7 @@ not a licence to change code speculatively.
 
 ## Overview
 - **Type:** feature | bug | tech-task | refactor | audit
-- **Intake:** linear · https://linear.app/…/SM-12  ·  status at intake: Todo
+- **Intake:** <INTAKE value from _STACK.md> · <ticket url> · status at intake: <status>
 - **Goal (verbatim from the source):** …
 - **Profile:** _(set by workflow-triage)_
 - **Status:** grooming

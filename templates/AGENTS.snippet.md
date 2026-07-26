@@ -32,6 +32,14 @@ bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile deep
 Never declare a phase done without the gate's exit code. An on-edit hook runs the formatter after every
 `Edit`/`Write`; instructions are advisory, hooks are not.
 
+### Tools are declared, not discovered
+
+This project's external tools — tracker, engines, check kit — are whatever `.tasks/_STACK.md` names, and
+nothing else. A CLI installed on the machine, a tool used in another repo, or a skill you know how to
+drive is **not** evidence that it belongs here. An unset value means "not configured" and the fallback is
+to ask, never to go looking. Side effects in someone else's workspace do not fail loudly; they succeed in
+the wrong place.
+
 ### Task workflow
 
 - `.tasks/<id>/` holds `PLAN.md` (always), plus `VALIDATION.md`, `OPEN_QUESTIONS.md`, `CHECKLIST.md`,

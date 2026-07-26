@@ -6,10 +6,12 @@
 #   intake.sh writeback <ref> --comment <txt> → post one comment (only if INTAKE_WRITEBACK=true)
 #   intake.sh contract                        → print the five fields the core needs
 #
-# The core knows a CONTRACT, never a tracker. Whatever you already use — your own CLI, `gh`, `jira`,
-# curl against an API — is configured as a command template in .tasks/_STACK.md:
+# The core knows a CONTRACT, never a tracker. Whatever the project already uses — an in-house CLI, `gh`,
+# `jira`, curl against an API — is configured as a command template in .tasks/_STACK.md:
 #
-#   INTAKE_CMD=linear-kit issue show <ref> --json
+#   INTAKE_CMD=<your-cli> issue show <ref> --json
+#
+# Nothing here infers a tracker. An unset INTAKE_CMD means manual intake, not "look for a CLI you know".
 #
 # `<ref>` is substituted with the ticket key. If the command emits JSON, this script maps the usual
 # field names itself. If it emits something else, it exits 4 and hands the raw output to the agent,

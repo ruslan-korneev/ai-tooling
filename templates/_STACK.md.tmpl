@@ -132,24 +132,11 @@ and writes the body to `.tasks/<id>/extra_context/ticket.md`. Output it cannot m
 to the agent, which normalizes it using `INTAKE_SKILL`. Empty `INTAKE_CMD` → manual intake: the operator
 pastes the ticket. **Never invent a ticket** because a fetch failed.
 
-Examples — pick the one you already have, or write your own:
-
-```ini
-# your own CLI (linear-kit)
-INTAKE=linear
-INTAKE_CMD=linear-kit issue show <ref> --json
-INTAKE_SKILL=linear-tasks
-INTAKE_STATUS_CMD=linear-kit issue update <ref> --state "<value>"
-INTAKE_COMMENT_CMD=linear-kit issue comment <ref> --message "<value>"
-
-# GitHub issues
-INTAKE=github-issues
-INTAKE_CMD=gh issue view <ref> --json number,title,body,url,state
-
-# Jira
-INTAKE=jira
-INTAKE_CMD=jira issue view <ref> --raw
-```
+**This block is the only statement of which tracker this project uses.** Empty `INTAKE_CMD` means manual
+intake — it does **not** mean "figure out which tracker CLI is installed". A tracker tool being present on
+the machine, or used in another repo, says nothing about this one; filing a ticket into the wrong
+workspace succeeds silently and nobody notices until someone reads the wrong backlog. Configuration
+examples for common trackers live in the `task-intake` skill, deliberately not here.
 
 `INTAKE_WRITEBACK=false` by default: agents read the tracker freely and write almost never. Set it to
 `true` and the loop makes exactly two writes — move the ticket at the start, and post the PR link at the
