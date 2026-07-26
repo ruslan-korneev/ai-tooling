@@ -67,7 +67,9 @@ STEP 3 — VALIDATE:
 
 STEP 4 — READY FOR REVIEW (in parallel):
   1. Fill in the PR summary + how-to-verify citing the evidence, then `gh pr ready` (the PR has been
-     a draft since STEP -1). Post the link to the tracker:
+     a draft since STEP -1). The body MUST carry a "## Not verified" section listing every check that
+     was NOT RUN and why, any acceptance line never observed, a degraded review diversity label, and any
+     skipped gate. "Tests are green" without that is true and useless. Post the link to the tracker:
      `bash scripts/ai/intake.sh writeback <REF> --comment "PR: <url>"` — the second and last tracker
      write of the run. Never close the ticket; that is the operator's.
   2. bash scripts/ai/review.sh 1 .tasks/<id>/VALIDATION.md --profile <profile>

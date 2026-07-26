@@ -61,8 +61,62 @@ test_command() {
 
 gate_test() { adw_run_cmd test "$(test_command "${1:-}")"; }
 
+# A test can fail for the wrong reason, or pass for no reason at all. Running the new tests against the
+# BASE branch catches the second: a test that is already green without the feature asserts nothing, and
+# the implementer will happily write code "to satisfy" it.
+gate_red_against_base() {
+  local target="${1:-}" base cmd tmp rc out changed
+  base="$(adw_cfg BASE_BRANCH main)"
+  git rev-parse --verify "$base" >/dev/null 2>&1 || base="origin/$base"
+  if ! git rev-parse --verify "$base" >/dev/null 2>&1; then
+    adw_warn "RED/base: base branch not found locally — skipping the tautology check"; return 0
+  fi
+
+  local test_paths; test_paths="$(adw_cfg TEST_PATHS tests)"
+  changed="$( { git diff --name-only "$base"...HEAD -- $test_paths 2>/dev/null;
+                git ls-files --others --exclude-standard -- $test_paths 2>/dev/null;
+                git diff --name-only HEAD -- $test_paths 2>/dev/null; } | sort -u | sed '/^$/d')"
+  if [[ -z "${changed// }" ]]; then
+    adw_warn "RED/base: no new or changed test files under '$test_paths' — nothing to verify"; return 0
+  fi
+
+  cmd="$(test_command "$target")"
+  tmp="$(mktemp -d)/base"
+  adw_log "RED/base: running the new tests against '$base' — they must fail there too"
+  if ! git worktree add --detach -q "$tmp" "$base" 2>/dev/null; then
+    adw_warn "RED/base: could not create a scratch worktree — skipping"; return 0
+  fi
+
+  local f
+  while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    mkdir -p "$tmp/$(dirname "$f")" && cp "$f" "$tmp/$f"
+  done <<< "$changed"
+
+  ( cd "$tmp" && bash "$here/setup-worktree.sh" >/dev/null 2>&1 )
+  out="$( cd "$tmp" && bash -c "$cmd" 2>&1 )"; rc=$?
+  git worktree remove --force "$tmp" >/dev/null 2>&1
+
+  if (( rc == 0 )); then
+    adw_warn "RED/base FAILED: these tests PASS on '$base', without the feature — they assert nothing new:"
+    printf '%s\n' "$changed" | sed 's/^/    /' >&2
+    adw_warn "Rewrite them to assert the behaviour the slice adds, then re-run. Do not implement against them."
+    return 1
+  fi
+  adw_log "RED/base OK: the new tests fail on '$base' too (exit $rc)"
+  return 0
+}
+
 gate_red() {
-  local cmd; cmd="$(test_command "${1:-}")"
+  local target="" check_base=1 a
+  for a in "$@"; do
+    case "$a" in
+      --no-base) check_base=0 ;;
+      *) target="$a" ;;
+    esac
+  done
+
+  local cmd; cmd="$(test_command "$target")"
   if [[ -z "${cmd// }" ]]; then
     adw_warn "RED gate: no TEST_CMD configured — this project cannot do TDD; use observation checks in VALIDATION.md"
     return 1
@@ -75,7 +129,9 @@ gate_red() {
     return 1
   fi
   adw_log "RED gate OK (exit $rc). Confirm the failure reason is the intended assertion, not a syntax/import error."
-  return 0
+
+  (( check_base )) || { adw_warn "RED/base check skipped (--no-base) — say so in the summary."; return 0; }
+  gate_red_against_base "$target"
 }
 
 gate_green() {
@@ -97,13 +153,41 @@ gate_groom() {
     adw_warn "G1 FAILED: $log missing — run groom-harden at least once."
     return 1
   fi
-  local quiet; quiet="$(grep -cE '^\|.*\| *(quiet|QUIET) *\|' "$log" || true)"
-  local last_two; last_two="$(grep -E '^\| *P[0-9]+' "$log" | tail -2)"
-  if [[ "$(printf '%s\n' "$last_two" | grep -cE '\| *(quiet|QUIET) *\|' || true)" -lt 2 ]]; then
-    adw_warn "G1 FAILED: need 2 consecutive quiet passes (no new blocker/major). Quiet passes so far: ${quiet:-0}"
+  # The lens set IS the coverage. Every lens gets one pass; a lens is repeated only if it found something
+  # major, and then only that lens. Counting "quiet passes" instead rewards re-running the same questions:
+  # on a real run, passes 5 and 6 produced three minors and no majors, for a third of the token budget.
+  local lenses lens closed missing="" profile all_lenses
+  all_lenses="$(adw_cfg LENSES contracts,failure-modes,adversary,meta | tr ',' ' ')"
+  # The profile decides how much coverage this task earns; PLAN.md records it (workflow-triage).
+  profile="$(grep -m1 -iE '^\s*[-*]?\s*\*\*Profile:\*\*' ".tasks/$id/PLAN.md" 2>/dev/null \
+             | grep -oiE 'light|standard|deep' | head -1 | tr '[:upper:]' '[:lower:]')"
+  profile="${profile:-$(adw_cfg DEFAULT_PROFILE standard)}"
+  case "$profile" in
+    light)    lenses="$(printf '%s' "$all_lenses" | awk '{print $1}')" ;;
+    standard) lenses="$(printf '%s\n' $all_lenses | grep -xE 'contracts|adversary' | tr '\n' ' ')"
+              [[ -n "${lenses// }" ]] || lenses="$(printf '%s' "$all_lenses" | awk '{print $1, $2}')" ;;
+    *)        lenses="$all_lenses" ;;
+  esac
+  adw_log "G1: profile '$profile' → lenses required:$(printf ' %s' $lenses)"
+  for lens in $lenses; do
+    # last row for this lens: | P<n> | <lens> | <outcome> | <blockers> | <majors> | ...
+    local row; row="$(grep -E "^\| *P[0-9]+ *\| *$lens *\|" "$log" | tail -1)"
+    if [[ -z "${row// }" ]]; then missing+=" $lens"; continue; fi
+    local blockers majors
+    blockers="$(printf '%s' "$row" | awk -F'|' '{gsub(/ /,"",$5); print $5}')"
+    majors="$(printf '%s'  "$row" | awk -F'|' '{gsub(/ /,"",$6); print $6}')"
+    if [[ "${blockers:-0}" != "0" || "${majors:-0}" != "0" ]]; then
+      adw_warn "G1: lens '$lens' last reported ${blockers:-?} blocker(s) / ${majors:-?} major(s) — fold them in and re-run THAT lens."
+      fail=1
+    else
+      closed+=" $lens"
+    fi
+  done
+  if [[ -n "${missing// }" ]]; then
+    adw_warn "G1 FAILED: no pass recorded for lens(es):$missing — one pass per lens, that is the coverage."
     fail=1
   fi
-  (( fail )) || adw_log "G1 OK: groom converged"
+  (( fail )) || adw_log "G1 OK: every lens closed clean ($(printf '%s' "$closed" | wc -w | tr -d ' ') lenses)"
   return $fail
 }
 
@@ -265,7 +349,7 @@ case "$cmd" in
   format)   gate_format "${1:-}" ;;
   static)   gate_static ;;
   test)     gate_test "${1:-}" ;;
-  red)      gate_red "${1:-}" ;;
+  red)      gate_red "$@" ;;
   green)    gate_green "${1:-}" ;;
   groom)     require_task "${1:-}"; gate_groom "$1" ;;
   plan)      require_task "${1:-}"; gate_plan "$1" ;;

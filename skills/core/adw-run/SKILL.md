@@ -35,8 +35,9 @@ so your context stays clean and the plan is not anchored on the first file anyon
 acceptance line → ≥1 runnable check, with where evidence lands). Uncertainties → `OPEN_QUESTIONS.md`.
 
 ### 3 · Groom passes (`groom-harden`, agent: `groom-hardener`)
-Loop until dry, one **fresh-context** pass per lens from `LENSES` in `_STACK.md`. Each pass reads
-`GROOM_LOG.md` first and appends its row. Stop when the last two passes are `quiet`.
+**One fresh-context pass per lens** from `LENSES` in `_STACK.md` — the lens set is the coverage. Each pass
+reads `GROOM_LOG.md` first and appends its row. A lens that reports blockers or majors re-runs **after its
+findings are folded in**; minors are recorded and never trigger another pass.
 Check mechanically: `bash scripts/ai/gate.sh groom <id>`.
 
 ### 4 · G2 — stop for the operator
@@ -93,8 +94,10 @@ lens reviewers in parallel, plus a wildcard hunting what those lenses cannot see
 that dedupes and adversarially verifies. In parallel, run `harness-improver` on the diff + `FRICTION.md`.
 
 ### 10 · G7 — stop for the operator
-Present the ranked, verified findings and the diversity label. `CHANGES_REQUESTED` → fix, re-validate,
-re-run the round (**max 6**). Merge is the operator's.
+Present the ranked, verified findings, the diversity label, **and what was never verified** — NOT RUN
+checks, acceptance lines never observed, gates skipped and why. That list is the part a solo run cannot
+produce; without it "green" says nothing about which parts of the green are load-bearing.
+`CHANGES_REQUESTED` → fix, re-validate, re-run the round (**max 6**). Merge is the operator's.
 
 ## Rules
 

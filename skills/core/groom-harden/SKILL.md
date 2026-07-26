@@ -19,7 +19,8 @@ The ledger is what keeps passes moving forward instead of re-deriving the same t
 
 ## Lenses (one per pass, rotating)
 
-From `LENSES` in `.tasks/_STACK.md` — the four core ones, plus any domain lenses the project added:
+From `LENSES` in `.tasks/_STACK.md` — the four core ones, plus any domain lenses the project added. The
+profile decides how many run: `light` → `contracts`; `standard` → `contracts` + `adversary`; `deep` → all.
 
 1. **contracts** — every API/event/persisted contract the slice introduces or touches: source of truth,
    payload shape, writers/readers, validation, versioning, forbidden writes. Ownership ambiguity between
@@ -48,16 +49,26 @@ Domain lenses (economy, compliance, accessibility, multi-tenancy, …) are data 
 6. Append your row to `GROOM_LOG.md`, and add anything you examined-and-settled to **Closed**, anything you
    judged unreal to **Rejected**.
 
-## Stop rule
+## Stop rule — coverage, not repetition
 
-Not a fixed count — **two consecutive `quiet` passes** (no new blocker, no new major) and no open blocker.
-Fixed counts either cut a hard slice short or force a simple one to manufacture findings.
+**One pass per lens.** The lens set is the coverage: when every lens has run once and closed clean, the
+groom is done. A lens is repeated **only if it found a blocker or a major**, and then only that lens,
+after its findings are folded in.
 
-Machine check: `bash scripts/ai/gate.sh groom <id>`.
+Counting "quiet passes" instead rewards asking the same questions again. Measured on a real run: passes
+five and six produced three minors and zero majors — a third of the token budget for nothing. All three
+majors came from distinct lenses, on their first pass.
+
+**Minors are recorded, not chased.** They go in the ledger's Minors table and stop there; fold one into the
+plan if it is cheap. A minor never justifies another pass.
+
+Machine check: `bash scripts/ai/gate.sh groom <id>` — passes when every lens in `LENSES` has a row whose
+last entry reports 0 blockers and 0 majors, and no blocker is open.
 
 Final line of every pass, exactly one of:
-- `VERDICT: QUIET` — nothing new at this lens; findings folded in; ledger updated.
-- `VERDICT: FINDINGS` — list them by severity; the next pass runs after they are folded in.
+- `VERDICT: QUIET` — nothing new at this lens; ledger updated; this lens is closed.
+- `VERDICT: FINDINGS` — blockers/majors listed; they get folded in and **this lens re-runs**. Minors alone
+  are not FINDINGS: record them and close the lens.
 
 ## Do not
 

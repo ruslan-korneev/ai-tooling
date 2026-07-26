@@ -123,8 +123,11 @@ operator reads one short list instead of six overlapping ones.
 - Diversity is labelled honestly: `CROSS-ENGINE` (≥2 vendors) > `CROSS-MODEL` (one vendor, ≥2 models,
   e.g. `claude:opus` + `claude:sonnet`) > `DEGRADED` (one entry — shares the implementer's blind spots,
   never an independent verdict).
-- Profiles: `light` = correctness only; `standard` = first three lenses + wildcard; `deep` = all lenses +
-  wildcard + judge. Set by `workflow-triage`.
+- Profiles: `light` = correctness only; `standard` = first three lenses + **wildcard + judge**; `deep` =
+  all lenses + wildcard + judge. Set by `workflow-triage`. The wildcard survives every profile above
+  `light` because the findings that matter most come from outside the technical lenses — "what does a user
+  who already paid see?" is not a correctness question. The judge survives because an unverified fan-out
+  spends the operator's attention on duplicates and plausible-but-wrong findings.
 - Findings feed `harness-improver`: a defect class that keeps reappearing is a missing rule or gate, not a
   reviewer win.
 - Add a domain lens by adding a `### lens: <name>` block here and listing it in `REVIEW_LENSES` in

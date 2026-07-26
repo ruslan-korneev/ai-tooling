@@ -98,6 +98,21 @@ had to do by hand twice. Raw material for `harness-improver`.
 
 - The PR already exists (opened as a draft in step 0). Now fill in the real summary + how-to-verify citing
   the evidence, then take it out of draft: `gh pr ready`.
+
+**The PR body must state what was NOT verified.** A required section:
+
+```markdown
+## Not verified
+- Check 4 (live payment observed end to end) — NOT RUN: needs the shared test merchant.
+- Checks 7, 9 — NOT RUN: <reason>.
+- Review ran DIVERSITY: CROSS-MODEL, not CROSS-ENGINE (one vendor available).
+- RED/base check skipped for <path> (--no-base) because <reason>.
+```
+
+This is the single thing a solo agent cannot give you. "Tests are green" is true and nearly useless on its
+own; what the operator needs is which parts of the green are load-bearing and which were never exercised.
+Burying it in `.tasks/` does not count — they read the PR. If everything ran, write "Everything in
+VALIDATION.md was run and passed" and mean it.
 - Post the PR link to the tracker: `bash scripts/ai/intake.sh writeback <REF> --comment "PR: <url>"`.
   That is the **second and last** tracker write of the run — no progress narration in between, and never
   close the ticket: that is the operator's, like merging.

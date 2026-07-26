@@ -54,6 +54,11 @@ Each row maps ONE acceptance line → a concrete check → an observable expecta
 - **Reviewer:** independently re-run every `auto` check; for `manual` ones, judge whether the recorded
   evidence is reproducible. A check with no reproducible evidence is **not** passed.
 
+Every check ends in one of three states, and the third is a legitimate outcome that must be **reported,
+not hidden**: `PASS` · `FAIL` · `NOT RUN` (with the reason). A run with four passes and three NOT RUN is
+useful information; the same run reported as "green" is a false claim. NOT RUN checks go into the PR body
+under "Not verified", not only into `.tasks/` — the operator reads the PR.
+
 ## Guardrails
 
 - Dev/staging only, never production data or environments.

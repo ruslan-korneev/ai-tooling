@@ -35,7 +35,9 @@ lenses="${lenses:-$(adw_cfg REVIEW_LENSES correctness,security,performance,archi
 
 case "$profile" in
   light)    IFS=',' read -ra lens_list <<< "correctness"; wildcard=0; judge=0 ;;
-  standard) IFS=',' read -ra all <<< "$lenses"; lens_list=("${all[@]:0:3}"); wildcard=1; judge=0 ;;
+  # wildcard + judge stay on at standard: on the evidence, the majors come from the adversarial angle,
+  # and an unjudged fan-out hands the operator six overlapping lists instead of one verified one.
+  standard) IFS=',' read -ra all <<< "$lenses"; lens_list=("${all[@]:0:3}"); wildcard=1; judge=1 ;;
   deep)     IFS=',' read -ra lens_list <<< "$lenses"; wildcard=1; judge=1 ;;
   *) adw_die "unknown profile: $profile (light|standard|deep)" ;;
 esac
@@ -54,6 +56,12 @@ task_id=""
 [[ -n "$validation" ]] && task_id="$(printf '%s' "$validation" | sed -E 's#^\.tasks/([^/]+)/.*#\1#')"
 outdir=".tasks/${task_id:-_review}/review/round-$round"
 mkdir -p "$outdir"
+
+# Reviewers run as separate CLI processes: their tokens never appear in the launching session's /cost.
+# Without this the operator picks a profile blind — "roughly twice as expensive" is not a number.
+export ADW_USAGE_FILE="$outdir/.usage.tsv"
+: > "$ADW_USAGE_FILE"
+start_ts="$(date -u +%s)"
 
 diversity="$("$here/engines.sh" diversity)"
 case "$diversity" in
@@ -139,6 +147,22 @@ if (( judge )); then
 fi
 
 if [[ ! -s "$final" ]]; then adw_die "no reviewer output (all engines failed)"; fi
+
+# Cost report — one row per engine call, plus a total. Reported even when partial.
+{
+  printf '# Review round %s — cost\n\nprofile: %s · lenses: %s · wildcard: %s · judge: %s · diversity: %s\n' \
+    "$round" "$profile" "${lens_list[*]}" "$wildcard" "$judge" "$diversity"
+  printf 'wall clock: %ss\n\n' "$(( $(date -u +%s) - start_ts ))"
+  if [[ -s "$ADW_USAGE_FILE" ]]; then
+    printf '| call | input | output | cache |\n| --- | --- | --- | --- |\n'
+    awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4; i+=$2; o+=$3; c+=$4}
+                END {printf "| **total** | **%d** | **%d** | **%d** |\n", i, o, c}' "$ADW_USAGE_FILE"
+  else
+    printf '_No usage reported: the engine did not return a JSON envelope. Wall clock above is all we have._\n'
+  fi
+} > "$outdir/cost.md"
+rm -f "$ADW_USAGE_FILE"
+adw_log "cost → $outdir/cost.md"
 
 if command -v gh >/dev/null 2>&1 && gh pr view >/dev/null 2>&1; then
   { printf 'ADW review round %s (profile %s, diversity %s)\n\n' "$round" "$profile" "$diversity"; cat "$final"; } \

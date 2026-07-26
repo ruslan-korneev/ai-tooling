@@ -14,19 +14,28 @@ do not ask the operator.
 | | `light` | `standard` | `deep` |
 | --- | --- | --- | --- |
 | Scout | skip (read the files directly) | yes | yes, multi-angle |
-| Groom passes | 1 | loop-until-dry, 2 lenses | loop-until-dry, all lenses |
+| Groom lenses | `contracts` | `contracts` + `adversary` | every lens in `LENSES` |
 | TDD | optional | yes where a test command exists | yes, RED gate enforced |
-| Review | 1 reviewer | 3 lenses + wildcard | all lenses + wildcard + judge |
+| Review | 1 reviewer | 3 lenses + **wildcard** + judge | all lenses + wildcard + judge |
 | Human gates | G7 only | G2 + G7 | G2 + G7 |
+
+**The wildcard reviewer and the judge stay on at `standard`.** Measured on a real run: every major finding
+came from an adversarial angle — the grooming `adversary` lens, and the review pass that asked "what does
+a person who already paid see?". Extra grooming passes past the lens set produced only minors. So weight
+belongs on adversarial review of the **diff**, not on more ceremony before the code exists.
 
 ## Choosing
 
 Go **deep** when *any* holds:
-- touches a contract others depend on (API, event, schema, replicated state)
 - data migration, or anything that can lose or corrupt persisted data
-- money, permissions, authentication, or progression state
-- concurrency, ordering, or retry semantics
 - a change that is hard to reverse once shipped (public interface, published asset, external side effect)
+- concurrency, ordering, or retry semantics across systems
+- a contract many consumers depend on
+
+Money, permissions, authentication and progression **do not automatically mean `deep`**. They mean the
+adversarial angle is mandatory — which `standard` already gives (the `adversary` groom lens plus the
+wildcard reviewer). Sending every money-touching task to `deep` costs several times more and, on the
+evidence, adds minors. Reach for `deep` when being wrong is *unrecoverable*, not merely expensive.
 
 Go **light** when *all* hold:
 - fully reversible in one revert, no state left behind

@@ -40,5 +40,9 @@ Procedure:
 Never write implementation code or fix product code. Never manufacture findings to look thorough — a clean
 groom passes cleanly, and the ledger makes an inflated pass obvious later.
 
-End with exactly one line: `VERDICT: QUIET` (nothing new at this lens) or `VERDICT: FINDINGS` (list them
-by severity).
+End with exactly one line: `VERDICT: QUIET` (nothing new worth acting on — this lens is closed) or
+`VERDICT: FINDINGS` (blockers/majors, listed by severity — they get folded in and this lens re-runs).
+
+**Minors alone are not FINDINGS.** Record them in the ledger's Minors table and close the lens. Your pass
+is one of a fixed set, one per lens; a lens that reports FINDINGS costs another full pass, so reserve it
+for something that changes scope, implementation, validation, or risk.
