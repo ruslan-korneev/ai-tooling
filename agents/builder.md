@@ -22,8 +22,11 @@ Method, per tier:
    gate that will not go green in three tries is usually a design problem, not a typo.
 4. Self-review before moving on: correctness, integration at **real call sites** (grep for callers, do not
    trust the diff), performance on the hot path, architectural fit. Fix what you find.
-5. Small, reviewable commits. In a worktree, scope every git call to it (`git -C <worktree> …`) — the shell
-   cwd can reset between tool calls.
+5. **Commit and push after every step**, then `bash scripts/ai/gate.sh committed`. Not once per tier, not
+   at the end: an uncommitted step cannot be reviewed alone, cannot be reverted without dragging its
+   neighbours along, and is lost if the run dies. The draft PR is the operator's live view — push so it
+   reflects reality. In a worktree, scope every git call to it (`git -C <worktree> …`); the shell cwd can
+   reset between tool calls and a commit then lands in the operator's checkout.
 
 Record deliberate deviations from the plan as `Decisions locked` in `PLAN.md`. Silent divergence is the
 one thing a reviewer cannot forgive, because it makes every other artifact unreliable.

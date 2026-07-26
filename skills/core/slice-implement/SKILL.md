@@ -8,16 +8,35 @@ description: The implementer playbook for an approved task — worktree, gate re
 You implement one approved task. Your plan is `.tasks/<id>/PLAN.md`, your acceptance is
 `.tasks/<id>/VALIDATION.md`, your commands come from `.tasks/_STACK.md`. Do not rely on prior chat context.
 
-## 0 · Setup + gate re-check
+## 0 · Workspace first — before a single source file is touched
 
-- Branch `<id>-<slug>` in a **worktree** (always — parallel runs and a clean operator tree are worth the
-  two seconds). Never work on the base branch.
-- `bash scripts/ai/setup-worktree.sh` — links dependency dirs from the primary checkout, copies local-only
-  config, and allocates per-worktree resources (ports, DB schema) into `.tasks/_worktree.env`. Source that
-  file before running anything that binds a port. Never run a package install through a symlinked dep dir.
-- Re-read `PLAN.md` + `OPEN_QUESTIONS.md`, then `bash scripts/ai/gate.sh plan <id>`. A **new blocker** (the
-  plan missed something, a contradiction, a missing contract) → **STOP**: record it as a `blocker`,
-  escalate, touch no code. Never guess; never push a broken PR.
+Order matters. Doing this at the end instead of the start is the difference between visible work and a
+pile of changes nobody can see, review, or recover.
+
+```bash
+git worktree add ../<repo>-<id> -b <id>-<slug>      # never the operator's checkout, never the base branch
+cd ../<repo>-<id>
+bash scripts/ai/setup-worktree.sh                    # links deps, copies local-only config, allocates ports
+git commit --allow-empty -m "<type>(<scope>): start <id>"
+git push -u origin HEAD
+gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+bash scripts/ai/gate.sh workspace <id>               # must exit 0 before you continue
+```
+
+Why each part is non-negotiable:
+- **Worktree** — the operator keeps working in their checkout while you run, and parallel slices stop
+  colliding. `setup-worktree.sh` makes it cheap: dependencies are symlinked, not reinstalled.
+- **Pushed branch** — a crash, a killed session, or a full disk otherwise takes the work with it.
+- **Draft PR from the start** — the operator can watch the diff grow instead of receiving a wall of code
+  at the end. Draft, not ready-for-review: it says "in progress", and it is opened before the code exists
+  precisely so nobody has to ask what you are doing.
+
+Then re-read `PLAN.md` + `OPEN_QUESTIONS.md` and run `bash scripts/ai/gate.sh plan <id>`. A **new
+blocker** (the plan missed something, a contradiction, a missing contract) → **STOP**: record it as a
+`blocker`, escalate, touch no code. Never guess.
+
+Source `.tasks/_worktree.env` before running anything that binds a port. Never run a package install
+through a symlinked dependency dir.
 
 ## 1 · RED (see `test-author`)
 
@@ -33,8 +52,21 @@ so; the acceptance then rides on observation checks.
   wrong goes back to the test-author with the reason; you do not bend it.
 - Reuse analogous existing code; match the surrounding style. Record deliberate deviations as
   `Decisions locked` in `PLAN.md` — never diverge silently.
-- Small, reviewable commits; `CHECKLIST.md` current. In a worktree, scope every `git` call to it
-  (`git -C <worktree> …`): the shell cwd can reset between tool calls and a commit then lands elsewhere.
+
+**Commit and push after every step — not every tier, every step.**
+
+```bash
+bash scripts/ai/gate.sh committed   # fails while anything is uncommitted or unpushed
+```
+
+A step that is not committed does not exist: it cannot be reviewed on its own, cannot be reverted without
+taking its neighbours with it, and is lost if the run dies. Ten small commits are reviewable; one blob at
+the end is not, and that is what the operator has to read. Push each one — the draft PR is the live view
+of what you are doing, and a PR that only updates at the end is a report, not a view.
+
+In a worktree, scope every `git` call to it (`git -C <worktree> …`): the shell cwd can reset between tool
+calls, and a commit then lands in the operator's checkout instead. Keep `CHECKLIST.md` current in the same
+commit as the step it describes.
 - Gate per tier: `bash scripts/ai/gate.sh green`. **Cap 3 fix attempts per failing gate** — on the 4th,
   stop and escalate with the raw error output. Ping-ponging against a gate burns budget and hides a real
   design problem.
@@ -54,9 +86,10 @@ so; the acceptance then rides on observation checks.
 Log harness friction as you hit it to `.tasks/<id>/FRICTION.md`: stale guidance, missing commands, work you
 had to do by hand twice. Raw material for `harness-improver`.
 
-## 5 · PR + review fan-out
+## 5 · Ready for review + review fan-out
 
-- `gh pr create` with a summary + how-to-verify citing the evidence.
+- The PR already exists (opened as a draft in step 0). Now fill in the real summary + how-to-verify citing
+  the evidence, then take it out of draft: `gh pr ready`.
 - Review goes **only** through `bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <p>`
   — lens reviewers in parallel, a wildcard for what they cannot see, a judge on `deep`. An ad-hoc agent
   review is not a substitute, including in a session that also did the grooming.

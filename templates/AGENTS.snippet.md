@@ -22,12 +22,18 @@ in parallel; `handoff` compacts a session.
 ```bash
 bash scripts/ai/gate.sh plan <id>       # plan + validation complete, acceptance mapped
 bash scripts/ai/gate.sh groom <id>      # no open blocker + two consecutive quiet groom passes
+bash scripts/ai/gate.sh workspace <id>  # own worktree + own branch + pushed + draft PR, BEFORE any code
+bash scripts/ai/gate.sh committed       # after every step: nothing uncommitted, nothing unpushed
 bash scripts/ai/gate.sh red [path]      # tests must FAIL before implementation exists
 bash scripts/ai/gate.sh green           # static + tests pass
 bash scripts/ai/gate.sh evidence <id>   # every validation check has evidence
 bash scripts/ai/guard.sh builder        # the implementer may not edit tests
 bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile deep
 ```
+
+**Implementation starts by creating the workspace, not by writing code**: worktree → branch → empty start
+commit → push → **draft PR** → `gate.sh workspace`. Then commit and push **after every step**. Work that
+is uncommitted or unpushed is invisible to the operator, unreviewable in pieces, and lost if the run dies.
 
 Never declare a phase done without the gate's exit code. An on-edit hook runs the formatter after every
 `Edit`/`Write`; instructions are advisory, hooks are not.

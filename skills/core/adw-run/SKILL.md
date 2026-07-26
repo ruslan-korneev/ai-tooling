@@ -43,9 +43,19 @@ Check mechanically: `bash scripts/ai/gate.sh groom <id>`.
 Present: goal, scope IN/OUT, the 3–5 decisions locked, open `clarify` assumptions, the check list, the
 profile, and the estimated tier count. Wait. Fold their corrections back into the artifacts.
 
-### 5 · Worktree
-Create branch `<id>-<slug>` in a **worktree** (always). Run `bash scripts/ai/setup-worktree.sh` — it links
-dependencies and allocates per-worktree resources (ports, schema) via `worktree-alloc.sh`.
+### 5 · Workspace — before any code
+Worktree, branch, empty start commit, push, **draft PR** — in that order, before a single source file is
+touched. Then `bash scripts/ai/gate.sh workspace <id>` must exit 0.
+
+```bash
+git worktree add ../<repo>-<id> -b <id>-<slug> && cd ../<repo>-<id>
+bash scripts/ai/setup-worktree.sh
+git commit --allow-empty -m "<type>(<scope>): start <id>" && git push -u origin HEAD
+gh pr create --draft --title "<id>: <title>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+```
+
+Doing this at the end instead makes the whole run invisible: the operator cannot watch the diff grow, a
+crash loses everything unpushed, and parallel slices collide in one checkout.
 
 ### 6 · RED (agent: `test-author`)
 Tests first, written by an agent that may not touch source (`guard.sh test-author`). Gate:
@@ -58,12 +68,16 @@ Builder receives the plan, the tests, and the signatures — not the grooming hi
 paths (`guard.sh builder`). Gate: `bash scripts/ai/gate.sh green`. **Cap 3 fix attempts per failing gate**;
 on the 4th, stop and escalate with the raw error output rather than looping.
 
+**Commit and push after every step**, then `bash scripts/ai/gate.sh committed`. The draft PR is the live
+view of the run — an uncommitted step is invisible to the operator and lost if the run dies.
+
 ### 8 · Validate (agent: `validator`)
 Run every `VALIDATION.md` check, save evidence to `.tasks/<id>/evidence/`.
 Gate: `bash scripts/ai/gate.sh evidence <id>`. Do not open a PR with red or unrun checks.
 
 ### 9 · Review fan-out
-`gh pr create`, then `bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <profile>` —
+Fill in the PR summary + how-to-verify, `gh pr ready` (it has been a draft since step 5), then
+`bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <profile>` —
 lens reviewers in parallel, plus a wildcard hunting what those lenses cannot see, plus (on `deep`) a judge
 that dedupes and adversarially verifies. In parallel, run `harness-improver` on the diff + `FRICTION.md`.
 

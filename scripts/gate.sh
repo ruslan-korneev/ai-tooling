@@ -9,6 +9,8 @@
 #   gate.sh green [path]           GREEN gate: static + tests must pass
 #   gate.sh groom <id>             G1: no open blocker + 2 quiet passes in GROOM_LOG.md
 #   gate.sh plan <id>              G2: PLAN.md + VALIDATION.md complete, acceptance mapped
+#   gate.sh workspace <id>         G3: linked worktree + own branch + pushed + draft PR open
+#   gate.sh committed              after every step: nothing left uncommitted
 #   gate.sh evidence <id>          G5: every VALIDATION.md check has evidence
 #   gate.sh all <id>               plan + green + evidence
 #
@@ -124,6 +126,79 @@ gate_plan() {
   return $fail
 }
 
+# G3 — the workspace itself. Checked BEFORE any source file is touched: an implementation that starts in
+# the operator's checkout, on the base branch, with nothing pushed and no PR, is invisible work. Nobody
+# can see it, nothing else can run in parallel, and a crash loses it.
+gate_workspace() {
+  local id="$1" fail=0 base branch root common main_root
+  base="$(adw_cfg BASE_BRANCH main)"
+  root="$(git rev-parse --show-toplevel)"
+  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  main_root="$(dirname "$common")"
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+
+  if [[ "$main_root" == "$root" ]]; then
+    adw_warn "G3: this is the primary checkout, not a worktree. Create one first:"
+    adw_warn "     git worktree add ../$(basename "$root")-$id -b $id-<slug> && cd ../$(basename "$root")-$id && bash scripts/ai/setup-worktree.sh"
+    fail=1
+  else
+    adw_log "G3: worktree OK ($root)"
+  fi
+
+  if [[ "$branch" == "$base" || "$branch" == "HEAD" ]]; then
+    adw_warn "G3: on '$branch' — implementation never happens on the base branch."
+    fail=1
+  fi
+
+  if ! git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+    adw_warn "G3: branch has no upstream — push it now so the work is visible: git push -u origin HEAD"
+    fail=1
+  elif [[ -n "$(git log '@{upstream}..HEAD' --oneline 2>/dev/null)" ]]; then
+    adw_warn "G3: local commits are not pushed — push after every step, not at the end."
+    fail=1
+  fi
+
+  if command -v gh >/dev/null 2>&1; then
+    local pr_state
+    pr_state="$(gh pr view --json isDraft,state -q '.state + " draft=" + (.isDraft|tostring)' 2>/dev/null)" || pr_state=""
+    if [[ -z "$pr_state" ]]; then
+      adw_warn "G3: no pull request for this branch. Open it as a DRAFT before implementing:"
+      adw_warn "     gh pr create --draft --title \"$id: <title>\" --body \"WIP. Plan: .tasks/$id/PLAN.md\""
+      fail=1
+    else
+      adw_log "G3: PR $pr_state"
+    fi
+  else
+    adw_warn "G3: gh not installed — cannot verify the draft PR. Open one by hand or say so in the summary."
+  fi
+
+  (( fail )) || adw_log "G3 OK: work is in its own worktree, on its own branch, pushed, with a PR open"
+  return $fail
+}
+
+# Run after every step. A step that is not committed does not exist: it cannot be reviewed, reverted,
+# or recovered, and a long uncommitted stretch turns into one unreviewable blob.
+gate_committed() {
+  local dirty; dirty="$(git status --porcelain 2>/dev/null | grep -v '^?? \.tasks/_worktree.env' || true)"
+  if [[ -n "${dirty// }" ]]; then
+    adw_warn "uncommitted changes — commit this step before starting the next one:"
+    printf '%s\n' "$dirty" | head -20 >&2
+    return 1
+  fi
+  if ! git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+    adw_warn "branch has no upstream — nothing has ever been pushed: git push -u origin HEAD"
+    return 1
+  fi
+  local unpushed
+  unpushed="$(git log '@{upstream}..HEAD' --oneline 2>/dev/null || true)"
+  if [[ -n "${unpushed// }" ]]; then
+    adw_warn "committed but not pushed ($(printf '%s\n' "$unpushed" | wc -l | tr -d ' ') commit(s)) — push so the PR reflects reality."
+    return 1
+  fi
+  adw_log "step committed and pushed"
+  return 0
+}
+
 gate_evidence() {
   local id="$1" val=".tasks/$1/VALIDATION.md" dir=".tasks/$1/evidence"
   [[ -f "$val" ]] || adw_die "no VALIDATION.md for $id"
@@ -143,9 +218,11 @@ case "$cmd" in
   test)     gate_test "${1:-}" ;;
   red)      gate_red "${1:-}" ;;
   green)    gate_green "${1:-}" ;;
-  groom)    require_task "${1:-}"; gate_groom "$1" ;;
-  plan)     require_task "${1:-}"; gate_plan "$1" ;;
-  evidence) require_task "${1:-}"; gate_evidence "$1" ;;
+  groom)     require_task "${1:-}"; gate_groom "$1" ;;
+  plan)      require_task "${1:-}"; gate_plan "$1" ;;
+  workspace) require_task "${1:-}"; gate_workspace "$1" ;;
+  committed) gate_committed ;;
+  evidence)  require_task "${1:-}"; gate_evidence "$1" ;;
   all)      require_task "${1:-}"; rc=0; gate_plan "$1" || rc=1; gate_green || rc=1; gate_evidence "$1" || rc=1; exit $rc ;;
   ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
   *) adw_die "unknown gate: $cmd" ;;

@@ -10,10 +10,17 @@ Profile: <light|standard|deep>.
 
 BRANCH: <id>-<slug>   (worktree: yes)
 
-SETUP: bash scripts/ai/setup-worktree.sh
-  Links dependency dirs from the primary checkout, copies local-only config, and allocates this
-  worktree's ports/schema into .tasks/_worktree.env. Source it before running anything that binds a
-  port: `set -a; . .tasks/_worktree.env; set +a`. Never run a package install through a symlinked dep dir.
+STEP -1 (workspace, BEFORE touching any source file — in this order):
+  git worktree add ../<repo>-<id> -b <id>-<slug> && cd ../<repo>-<id>
+  bash scripts/ai/setup-worktree.sh        # links deps, copies local-only config, allocates ports/schema
+  git commit --allow-empty -m "<type>(<scope>): start <id>"
+  git push -u origin HEAD
+  gh pr create --draft --title "<id>: <name>" --body "WIP. Plan: .tasks/<id>/PLAN.md"
+  bash scripts/ai/gate.sh workspace <id>   # must exit 0 before you continue
+  Source the env before running anything that binds a port: `set -a; . .tasks/_worktree.env; set +a`.
+  Never run a package install through a symlinked dep dir.
+  Doing this at the end instead makes the run invisible: nobody can watch the diff grow, and a crash
+  takes everything unpushed with it.
 
 STEP 0 (gate): re-read PLAN.md + OPEN_QUESTIONS.md, then:
   bash scripts/ai/gate.sh plan <id>
@@ -33,6 +40,12 @@ STEP 1 — RED (tests first):
   Commit the RED state. No test command configured → say so, skip RED, rely on observation checks.
   Do not fake a TDD step.
 
+COMMIT CADENCE (every step, not every tier):
+  After each step: commit + push, then `bash scripts/ai/gate.sh committed` (fails while anything is
+  uncommitted or unpushed). Small commits are reviewable; one blob at the end is not, and the draft PR
+  is the operator's live view of the run. In a worktree, scope git calls: `git -C <worktree> ...` — the
+  shell cwd can reset between tool calls and a commit then lands in the operator's checkout.
+
 STEP 2 — GREEN (tier by tier):
   Implement the minimum that makes the tests pass and the acceptance true. You may NOT edit test files:
     bash scripts/ai/guard.sh builder --head
@@ -49,8 +62,9 @@ STEP 3 — VALIDATE:
   and WAIT for their "go", then run your checks and report "done". Never seize or restart a shared
   resource yourself.
 
-STEP 4 — PR + REVIEW (in parallel):
-  1. gh pr create — summary + how-to-verify citing the evidence.
+STEP 4 — READY FOR REVIEW (in parallel):
+  1. Fill in the PR summary + how-to-verify citing the evidence, then `gh pr ready` (the PR has been
+     a draft since STEP -1).
   2. bash scripts/ai/review.sh 1 .tasks/<id>/VALIDATION.md --profile <profile>
      Lens reviewers in parallel + a wildcard + (deep) a judge. Findings are posted to the PR.
   3. harness-improver on the diff + .tasks/<id>/FRICTION.md → HARNESS_PROPOSALS.md (proposals only).
