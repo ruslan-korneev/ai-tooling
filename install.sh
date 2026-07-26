@@ -23,7 +23,7 @@ set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION="2.0.0"
-SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh review.sh setup-worktree.sh worktree-alloc.sh"
+SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 die() { echo "[ai-tooling] ERROR: $*" >&2; exit 1; }
 info() { echo "[ai-tooling] $*" >&2; }
@@ -51,7 +51,8 @@ cmd_list() {
   echo "  gate.sh    format|static|test|red|green|groom|plan|evidence|all"
   echo "  guard.sh   builder|test-author|reviewer|planner   (phase file-scope, mechanical)"
   echo "  review.sh  <round> [validation] --profile light|standard|deep   (lens fan-out + judge)"
-  echo "  engines.sh list|pick-review|diversity|run"
+  echo "  intake.sh  fetch <ref>|writeback <ref> --status|--comment|contract"
+  echo "  engines.sh candidates|probe --write|list|pick-review|diversity|run"
   echo "  setup-worktree.sh · worktree-alloc.sh"
   echo
   echo "Stack profiles: $(all_stacks | tr '\n' ' ')"

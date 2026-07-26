@@ -8,7 +8,7 @@ core file. Skills, subagents, and machine-checkable gates live here; everything 
 ├── install.sh              install · list · doctor · uninstall
 ├── skills/core/<id>/       17 stack-agnostic skills
 ├── agents/<name>.md        9 subagents, each defined by what it may NOT touch
-├── scripts/                gate.sh · guard.sh · engines.sh · review.sh · worktree-*.sh
+├── scripts/                gate.sh · guard.sh · intake.sh · engines.sh · review.sh · worktree-*.sh
 ├── stacks/<name>.stack     command profiles: generic · node-ts · python · go · roblox
 └── templates/              _STACK.md · dev-prompt · GROOM_LOG · BOARD · PROPOSALS · hooks · AGENTS block
 ```
@@ -105,6 +105,29 @@ Instructions are advisory; hooks and exit codes are not.
 | `slice-reviewer`, `wildcard-reviewer`, `review-judge` | everything (read-only) |
 
 `guard.sh` enforces this on the diff. A prompt that says "please don't" is not a boundary.
+
+## Intake — any tracker, your own tooling, no MCP
+
+The core knows a five-field contract (`id`, `title`, `body`, `url`, `status`) and runs **your** command
+to satisfy it:
+
+```ini
+INTAKE=linear
+INTAKE_CMD=linear-kit issue show <ref> --json
+INTAKE_SKILL=linear-tasks
+INTAKE_STATUS_CMD=linear-kit issue update <ref> --state "<value>"
+INTAKE_COMMENT_CMD=linear-kit issue comment <ref> --message "<value>"
+```
+
+```bash
+bash scripts/ai/intake.sh fetch SM-12          # → normalized JSON + extra_context/ticket.md
+bash scripts/ai/intake.sh writeback SM-12 --comment "PR: <url>"
+```
+
+JSON output is mapped automatically (`identifier|key|id`, `title|name|summary`, `description|body`, …).
+Anything else is handed to the agent with `INTAKE_SKILL` named. No `INTAKE_CMD` → manual paste. A new
+tracker is one config line; a failed fetch is a stop, never an invented ticket. Writeback is off by
+default and, when on, makes exactly two writes: in-progress at the start, PR link at the end.
 
 ## Engines — installed ≠ usable
 

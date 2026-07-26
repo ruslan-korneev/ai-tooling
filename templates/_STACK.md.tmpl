@@ -114,9 +114,43 @@ Where "what are we building and why" lives (repo path, wiki URL, tracker). Read 
 
 ## Task intake
 
-How tasks enter the loop. `manual` = a prompt from the operator. Adapters: `linear`, `github-issues`.
+How tasks enter the loop. The core knows a **contract** (`id`, `title`, `body`, `url`, `status`) and runs
+**your** command to satisfy it — it never knows the tracker. No MCP required; whatever you already use is
+first-class. `<ref>` is replaced with the ticket key, `<value>` with the status or comment text.
 
 ```ini
 INTAKE=manual
-INTAKE_REF=
+INTAKE_CMD=
+INTAKE_SKILL=
+INTAKE_WRITEBACK=false
+INTAKE_STATUS_CMD=
+INTAKE_COMMENT_CMD=
 ```
+
+`bash scripts/ai/intake.sh fetch <ref>` runs `INTAKE_CMD`, maps common JSON field names to the contract,
+and writes the body to `.tasks/<id>/extra_context/ticket.md`. Output it cannot map → it hands the raw text
+to the agent, which normalizes it using `INTAKE_SKILL`. Empty `INTAKE_CMD` → manual intake: the operator
+pastes the ticket. **Never invent a ticket** because a fetch failed.
+
+Examples — pick the one you already have, or write your own:
+
+```ini
+# your own CLI (linear-kit)
+INTAKE=linear
+INTAKE_CMD=linear-kit issue show <ref> --json
+INTAKE_SKILL=linear-tasks
+INTAKE_STATUS_CMD=linear-kit issue update <ref> --state "<value>"
+INTAKE_COMMENT_CMD=linear-kit issue comment <ref> --message "<value>"
+
+# GitHub issues
+INTAKE=github-issues
+INTAKE_CMD=gh issue view <ref> --json number,title,body,url,state
+
+# Jira
+INTAKE=jira
+INTAKE_CMD=jira issue view <ref> --raw
+```
+
+`INTAKE_WRITEBACK=false` by default: agents read the tracker freely and write almost never. Set it to
+`true` and the loop makes exactly two writes — move the ticket at the start, and post the PR link at the
+end. Closing the ticket stays a human decision, like merging.
