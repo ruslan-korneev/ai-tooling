@@ -5,6 +5,7 @@
 #   bash ~/.config/ai-tooling/install.sh list
 #   bash ~/.config/ai-tooling/install.sh doctor <target-dir>
 #   bash ~/.config/ai-tooling/install.sh uninstall <target-dir>
+#   bash ~/.config/ai-tooling/install.sh self-install     # put the /adw-install skill in ~/.claude/skills
 #
 # Options for `install`:
 #   --stack <name>        stack profile from stacks/ (auto-detected when omitted)
@@ -58,6 +59,8 @@ cmd_list() {
   echo "  setup-worktree.sh · worktree-alloc.sh"
   echo
   echo "Stack profiles: $(all_stacks | tr '\n' ' ')"
+  echo
+  echo "Bootstrap: install.sh self-install → /adw-install skill (interactive setup inside a repo)"
 }
 
 detect_stack() {
@@ -325,6 +328,15 @@ cmd_doctor() {
   true
 }
 
+# The bootstrap skill has to exist BEFORE a project has the harness, so it lives at user level.
+cmd_self_install() {
+  local dest="$HOME/.claude/skills/adw-install"
+  mkdir -p "$dest"
+  cp "$SRC/bootstrap/adw-install/SKILL.md" "$dest/SKILL.md"
+  echo "[ai-tooling] installed /adw-install → $dest/SKILL.md"
+  echo "[ai-tooling] run it inside any repository to set the harness up there, interactively."
+}
+
 cmd_uninstall() {
   TARGET="${1:-}"; [[ -n "$TARGET" ]] || die "usage: uninstall <target-dir>"
   TARGET="$(cd "$TARGET" && pwd)"
@@ -342,10 +354,11 @@ cmd_uninstall() {
 }
 
 case "${1:-}" in
-  install)   shift; cmd_install "$@" ;;
+  install)      shift; cmd_install "$@" ;;
+  self-install) cmd_self_install ;;
   list|"")   cmd_list ;;
   doctor)    shift; cmd_doctor "$@" ;;
   uninstall) shift; cmd_uninstall "$@" ;;
   -h|--help) sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
-  *) die "unknown command: $1 (install|list|doctor|uninstall)" ;;
+  *) die "unknown command: $1 (install|self-install|list|doctor|uninstall)" ;;
 esac

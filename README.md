@@ -26,6 +26,21 @@ design is broken.** Anything that differs must be expressible as data or as a se
 
 ## Install
 
+**Interactively (recommended)** — a session that works out this project's real commands, intake and
+engines, verifies the gates run, and offers to open a PR adding the harness:
+
+```bash
+bash ~/.config/ai-tooling/install.sh self-install    # once per machine: adds the /adw-install skill
+cd /path/to/project && claude
+/adw-install
+```
+
+A stack profile guesses `ruff check .`; the interactive install reads the Makefile, the CI workflow and
+the dependency manager, **runs** each candidate command, and records only the ones that work — a gate
+configured with a command that errors reports `SKIPPED` while the loop looks green.
+
+**Mechanically:**
+
 ```bash
 bash ~/.config/ai-tooling/install.sh install /path/to/project     # stack auto-detected
 bash ~/.config/ai-tooling/install.sh install . --stack python
