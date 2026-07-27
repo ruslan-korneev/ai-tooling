@@ -22,18 +22,33 @@ RUN_CMD={{RUN_CMD}}
 `FORMAT_CMD` writes (used by the on-edit hook); `FORMAT_CHECK_CMD` only verifies (used by gates).
 `TEST_ONE_CMD` may contain `<path>` — gates substitute the target.
 
+**An empty value needs a reason.** `LINT_CMD=` alone is indistinguishable from a forgotten one; write
+`LINT_CMD=   # none: no linter in this toolchain, CI does not run one` and `doctor` reports the reason
+instead of a warning. Everything after ` # ` is a note, not part of the command.
+
 ## Repo facts
 
 ```ini
 BASE_BRANCH={{BASE_BRANCH}}
 DEP_DIRS={{DEP_DIRS}}
 LOCAL_ONLY_FILES={{LOCAL_ONLY_FILES}}
+BOOTSTRAP_CMD=
+SIBLING_REPOS=
 DEFAULT_PROFILE=standard
 TEST_PATHS=tests
 SRC_PATHS=src
 ```
 
-`DEP_DIRS` are symlinked into worktrees; `LOCAL_ONLY_FILES` are copied. `TEST_PATHS` / `SRC_PATHS` are what
+`DEP_DIRS` are symlinked into worktrees; `LOCAL_ONLY_FILES` are copied.
+
+`BOOTSTRAP_CMD` runs inside a fresh worktree (and is what makes a fresh clone buildable): generated
+artifacts — bindings, codegen, protobufs — must be **regenerated, never copied**. A copied artifact that
+has drifted from its source produces a silently wrong build instead of an error.
+
+`SIBLING_REPOS` lists other checkouts this product spans, as `<path>[:ro|:ask]`. A harness instance covers
+one repository, so nothing in this repo's diff can reveal an edit made next door — `guard.sh siblings`
+checks them for uncommitted changes instead. `:ro` means never touch it; `:ask` means the operator decides
+before it is touched. `TEST_PATHS` / `SRC_PATHS` are what
 `scripts/ai/guard.sh` uses to enforce phase file-scope (the builder may not touch tests, the test-author
 may not touch src).
 
@@ -121,6 +136,7 @@ first-class. `<ref>` is replaced with the ticket key, `<value>` with the status 
 ```ini
 INTAKE=manual
 INTAKE_CMD=
+INTAKE_CWD=
 INTAKE_SKILL=
 INTAKE_WRITEBACK=false
 INTAKE_STATES_CMD=
@@ -140,6 +156,11 @@ bash scripts/ai/intake.sh writeback SM-12 --status start
 (`started` / `completed` / …) and picks: `start` → the earliest in-progress state, `review` → the review
 column, `done` → a completed state. A workspace-wide listing is narrowed to the ticket's own team using
 the key prefix. Leave `INTAKE_STATES_CMD` empty and `--status "Some Name"` is passed through literally.
+
+`INTAKE_CWD` is where intake commands run. Tracker CLIs commonly resolve their target by walking **up**
+from the working directory, so the same command run from a worktree can bind to a different project — or
+to none. A misdirected write lands in someone else's backlog and does not fail. Leave it empty to use the
+repo root; set it when the binding lives outside the repository.
 
 `bash scripts/ai/intake.sh fetch <ref>` runs `INTAKE_CMD`, maps common JSON field names to the contract,
 and writes the body to `.tasks/<id>/extra_context/ticket.md`. Output it cannot map → it hands the raw text

@@ -1,0 +1,14 @@
+# Stack profile: Xcode project/workspace — selected when .xcodeproj/.xcworkspace is present
+STACK_NAME=Swift (Xcode)
+LINT_CMD=
+TYPECHECK_CMD=xcodebuild -scheme <scheme> -destination 'platform=macOS' build
+FORMAT_CMD=swift format -i --recursive .
+FORMAT_CHECK_CMD=swift format lint --recursive .
+TEST_CMD=xcodebuild -scheme <scheme> -destination 'platform=macOS' test
+TEST_ONE_CMD=xcodebuild -scheme <scheme> -destination 'platform=macOS' test -only-testing:<path>
+BUILD_CMD=xcodebuild -scheme <scheme> -configuration Release build
+RUN_CMD=
+DEP_DIRS=
+LOCAL_ONLY_FILES=
+BASE_BRANCH=main
+NOTES=Replace <scheme> with the real scheme (`xcodebuild -list`) and fix the destination for the target platform — these commands do not run until you do. An Xcode project is not a SwiftPM package: `swift build` and `swift test` will not drive it.

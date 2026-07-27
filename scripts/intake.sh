@@ -105,6 +105,23 @@ pathlib.Path(sys.argv[1]).write_text(
 )
 PY
 
+# Tracker CLIs often resolve their target (workspace/team/project) by walking UP from the working
+# directory, so the same command run from a worktree can bind to a different project — or to none.
+# A misdirected write lands in someone else's backlog and does not fail. Pin the directory.
+intake_cwd() {
+  local dir; dir="$(adw_cfg INTAKE_CWD)"
+  [[ -n "${dir// }" ]] || { printf '%s' "$(adw_repo_root)"; return 0; }
+  case "$dir" in
+    /*) ;;                                   # absolute: use as given
+    *)  dir="$(adw_repo_root)/$dir" ;;       # relative: from the repo root, not the caller's cwd
+  esac
+  if [[ ! -d "$dir" ]]; then
+    adw_warn "INTAKE_CWD points at a missing directory: $dir — falling back to the repo root"
+    printf '%s' "$(adw_repo_root)"; return 0
+  fi
+  printf '%s' "$dir"
+}
+
 normalize_json() { python3 -c "$NORMALIZE_PY"; }  # stdin: raw output → stdout: contract JSON, or exit 4
 
 # Workflow states differ per team and per tracker: "In Progress", "Doing", "Начали". The core knows
@@ -214,10 +231,11 @@ fetch() {
     exit 3
   fi
 
-  local resolved="${cmd//<ref>/$ref}"
-  adw_log "intake: $resolved"
+  local resolved="${cmd//<ref>/$ref}" cwd
+  cwd="$(intake_cwd)"
+  adw_log "intake: $resolved${cwd:+  (cwd: $cwd)}"
   local out rc
-  out="$(bash -c "$resolved" 2>&1)"; rc=$?
+  out="$( cd "${cwd:-.}" && bash -c "$resolved" 2>&1 )"; rc=$?
   if (( rc != 0 )) || [[ -z "${out// }" ]]; then
     adw_warn "intake command failed (exit $rc):"
     printf '%s\n' "$out" | head -20 >&2
@@ -274,10 +292,11 @@ writeback() {
   esac
   [[ -n "${tmpl// }" ]] || { adw_warn "no INTAKE_${kind^^}_CMD configured → skipping"; return 0; }
 
-  local resolved="${tmpl//<ref>/$ref}"
+  local resolved="${tmpl//<ref>/$ref}" cwd
   resolved="${resolved//<value>/$value}"
-  adw_log "writeback ($kind): $resolved"
-  bash -c "$resolved" || adw_warn "writeback failed — the run continues; the tracker is not the source of truth for engineering state."
+  cwd="$(intake_cwd)"
+  adw_log "writeback ($kind): $resolved${cwd:+  (cwd: $cwd)}"
+  ( cd "${cwd:-.}" && bash -c "$resolved" ) || adw_warn "writeback failed — the run continues; the tracker is not the source of truth for engineering state."
 }
 
 states() { # show how intents resolve against this tracker — diagnostic, writes nothing

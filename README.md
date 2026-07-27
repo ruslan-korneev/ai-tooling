@@ -10,7 +10,8 @@ core file. Skills, subagents, and machine-checkable gates live here; everything 
 ├── agents/<name>.md        9 subagents, each defined by what it may NOT touch
 ├── scripts/                gate.sh · guard.sh · intake.sh · engines.sh · review.sh · worktree-*.sh
 ├── stacks/<name>.stack     command profiles: generic · node-ts · python · go · roblox
-└── templates/              _STACK.md · dev-prompt · GROOM_LOG · BOARD · PROPOSALS · hooks · AGENTS block
+├── templates/              _STACK.md · dev-prompt · GROOM_LOG · BOARD · PROPOSALS · hooks · AGENTS block
+└── tests/                  the gates' own test suite — bash + git, no other dependency
 ```
 
 ## The three layers (the law of this repo)
@@ -96,6 +97,23 @@ bash scripts/ai/review.sh 1 .tasks/<id>/VALIDATION.md --profile deep
 
 An on-edit hook runs the project's formatter after every `Edit`/`Write` (`--no-hooks` to opt out).
 Instructions are advisory; hooks and exit codes are not.
+
+## The gates have their own gate
+
+An exit code nobody checks is an opinion with better posture, so the gates are themselves tested —
+against throwaway git repos, with no network, no `gh` and no engine CLI:
+
+```bash
+bash tests/run.sh                        # every case
+bash tests/run.sh gate-plan              # one
+ADW_TEST_SHELL=/bin/bash bash tests/run.sh   # under macOS's bash 3.2
+```
+
+CI runs both on Linux and macOS. A case may declare a **known gap** — the behaviour we want, asserted
+where the code does not deliver it yet. A known gap keeps the suite green and reports itself; the day
+it starts passing, the suite fails so the test gets promoted instead of quietly rotting. The current
+three are printed by every run, and `tests/run.sh` ends by naming the surface it does **not** cover
+(anything needing a remote, `gh`, or a live engine).
 
 ## Profiles — right-size the loop
 
