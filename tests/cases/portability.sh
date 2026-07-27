@@ -18,18 +18,38 @@ if [[ -x /bin/bash ]]; then
   check 'every core script parses under /bin/bash' 0 parses_under /bin/bash
 fi
 
-# Constructs that need bash 4+. Known offenders as of this commit:
-#   scripts/gate.sh:290    ${have,,} / ${want,,}   — ticket-state comparison in G3
-#   scripts/intake.sh:293  ${kind^^}               — building the INTAKE_<KIND>_CMD name
-#   scripts/review.sh:76-77 mapfile                — reading the engine list
+# Two different strippings, because the two rules need different things.
+#
+# Comments only, for bash-4 expansions: `"${have,,}"` lives INSIDE double quotes almost every time it
+# appears, so stripping quoted strings would blind the check to exactly what it is looking for. Verified
+# by putting `${have,,}` back in gate.sh and watching a quote-stripping version report nothing.
+code_lines() { sed -E 's/#.*$//' "$@"; }
+# Comments and quoted strings, for tool names: naming a binary in a warning ("no shasum/sha256sum here")
+# is not a use of it. Blind spot, accepted: a real call hidden in a quoted command string is invisible.
+code_lines_bare() { sed -E 's/"[^"]*"//g; s/#.*$//' "$@"; }
+
+# Constructs that need bash 4+. The portable replacements: `lower`/`upper` in lib.sh for case folding,
+# and `while IFS= read -r l; do a+=("$l"); done < <(cmd)` for mapfile.
 bash4_free() {
   local hits
-  hits="$(grep -nE 'mapfile|readarray|declare -A|\$\{[A-Za-z_][A-Za-z0-9_]*(,,|\^\^)' \
-          "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh)" || return 0
+  hits="$(code_lines "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh \
+          | grep -nE 'mapfile|readarray|declare -A|\$\{[A-Za-z_][A-Za-z0-9_]*(,,|\^\^)')" || return 0
   printf '%s\n' "$hits"
   return 1
 }
-check_xfail 'core scripts avoid bash-4-only constructs' 0 bash4_free
+check 'core scripts avoid bash-4-only constructs' 0 bash4_free
+
+# The replacements themselves, exercised under the oldest shell rather than trusted.
+folds_under_32() {
+  /bin/bash -c 'source "$1"/scripts/lib.sh
+    [[ "$(lower ABC-12)" == "abc-12" ]] || { echo "lower failed: $(lower ABC-12)"; exit 1; }
+    [[ "$(upper status)" == "STATUS" ]] || { echo "upper failed: $(upper status)"; exit 1; }
+    a=(); while IFS= read -r l; do a+=("$l"); done < <(printf "x\ny\n")
+    [[ "${#a[@]}" == 2 && "${a[1]}" == "y" ]] || { echo "array read failed"; exit 1; }' _ "$ADW_ROOT"
+}
+if [[ -x /bin/bash ]]; then
+  check 'lower/upper and the mapfile replacement work under /bin/bash' 0 folds_under_32
+fi
 
 # GNU-only tools are the other half of the same problem: absent from a stock macOS, so a script that
 # reaches for one works on CI and dies on the operator's laptop. `timeout` is not in this list on
@@ -41,7 +61,7 @@ check_xfail 'core scripts avoid bash-4-only constructs' 0 bash4_free
 # Blind spot, accepted: a genuine call hidden inside a double-quoted command string is invisible here.
 gnu_free() {
   local hits
-  hits="$(sed -E 's/"[^"]*"//g; s/#.*$//' "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh \
+  hits="$(code_lines_bare "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh \
           | grep -nE '(^|[^[:alnum:]_-])(realpath|sha256sum|tac|readlink -f|date -d|stat -c|grep -P|xargs -r)([^[:alnum:]_-]|$)' \
           | grep -v 'command -v')" || return 0
   printf '%s\n' "$hits"

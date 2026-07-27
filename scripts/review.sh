@@ -76,8 +76,10 @@ context_common=$'\n\n'"CONTEXT: branch '$branch' vs '$base' (review round $round
 [[ -n "$validation" ]] && context_common+=$'\n'"Validation criteria: $validation — re-run the checks you can (static + tests + READ-ONLY inspection). Never run destructive or shared-state-mutating checks. A check with no reproducible evidence is NOT passed."
 
 count=$(( ${#lens_list[@]} + wildcard ))
-mapfile -t engines < <("$here/engines.sh" pick-review "$count")
-mapfile -t usable < <("$here/engines.sh" list 2>/dev/null)
+# `while read`, not mapfile: mapfile is bash 4+. On bash 3.2 it is simply not a command, and the next
+# line reads ${engines[0]} under `set -u` and aborts — a review that dies before spawning a reviewer.
+engines=(); while IFS= read -r _line; do engines+=("$_line"); done < <("$here/engines.sh" pick-review "$count")
+usable=();  while IFS= read -r _line; do usable+=("$_line");  done < <("$here/engines.sh" list 2>/dev/null)
 
 # run_lens <engine> <outfile> <prompt> — retries once on a different usable engine when output is empty
 # (an unauthenticated or rate-limited CLI fails silently; a missing lens must not look like a clean lens).
