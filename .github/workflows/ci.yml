@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: self-tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash version
+        run: bash --version | head -1
+
+      - name: self-tests
+        run: bash tests/run.sh
+
+      # macOS ships bash 3.2 as /bin/bash, and `#!/usr/bin/env bash` finds it whenever Homebrew's bash
+      # is not on PATH — which is the operator's laptop, not this runner. Run the suite there too.
+      - name: self-tests under bash 3.2
+        if: runner.os == 'macOS'
+        run: ADW_TEST_SHELL=/bin/bash bash tests/run.sh
