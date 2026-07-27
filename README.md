@@ -98,6 +98,13 @@ bash scripts/ai/review.sh 1 .tasks/<id>/VALIDATION.md --profile deep
 An on-edit hook runs the project's formatter after every `Edit`/`Write` (`--no-hooks` to opt out).
 Instructions are advisory; hooks and exit codes are not.
 
+**Three outcomes, not two.** `0` passed · `1` failed · `2` misuse · **`3` DEGRADED: the gate ran no
+check at all.** A command left empty in `_STACK.md` is reported as `SKIPPED`, and a gate where *nothing*
+ran exits 3 rather than 0 — otherwise a project with an empty adapter finishes green having verified
+nothing, which is the same disease as an unauthenticated review engine returning silence. Leave a reason
+next to a genuinely absent command (`LINT_CMD=   # none: no linter for Luau`) and the gate quotes it back
+instead of reporting a missing config; the verdict is unchanged, because no linter is still no coverage.
+
 ## The gates have their own gate
 
 An exit code nobody checks is an opinion with better posture, so the gates are themselves tested —

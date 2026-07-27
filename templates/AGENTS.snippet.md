@@ -32,6 +32,10 @@ bash scripts/ai/guard.sh builder        # the implementer may not edit tests
 bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile deep
 ```
 
+Exit codes are `0` passed · `1` failed · `2` misuse · **`3` DEGRADED — the gate ran no check at all**.
+A `3` is not a pass: it says this project has nothing configured for that gate, so the run verified
+nothing. It belongs in the PR's `## Not verified` section, never in a green summary.
+
 **Implementation starts by creating the workspace, not by writing code**: worktree → branch → **commit
 `.tasks/<id>/` as the first commit** → push → **draft PR** → move the ticket to in-progress →
 `gate.sh workspace`. Then commit and push **after every step**. Work that is uncommitted or unpushed is

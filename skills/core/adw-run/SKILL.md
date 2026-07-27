@@ -80,6 +80,11 @@ Builder receives the plan, the tests, and the signatures — not the grooming hi
 paths (`guard.sh builder`). Gate: `bash scripts/ai/gate.sh green`. **Cap 3 fix attempts per failing gate**;
 on the 4th, stop and escalate with the raw error output rather than looping.
 
+**Exit 3 is not a pass.** It means the gate ran no check at all — nothing about the diff was verified.
+Do not treat it as green and do not "fix" it by moving on: record it in `FRICTION.md`, carry it to G7,
+and put it in the PR's `## Not verified` section. A partial (`green: PARTIAL — …`) exits 0 and travels
+the same way; the run continues, the claim shrinks.
+
 **Commit and push after every step**, then `bash scripts/ai/gate.sh committed`. The draft PR is the live
 view of the run — an uncommitted step is invisible to the operator and lost if the run dies.
 
@@ -103,7 +108,10 @@ produce; without it "green" says nothing about which parts of the green are load
 ## Rules
 
 - **A `blocker` stops the run.** Write it to `OPEN_QUESTIONS.md`, surface it, wait. Never guess past it.
-- **Gates are scripts, not opinions.** Never declare a phase done without the gate's exit code.
+- **Gates are scripts, not opinions.** Never declare a phase done without the gate's exit code. Three
+  codes, not two: `0` passed · `1` failed · `3` DEGRADED, nothing ran. Collapsing 3 into 0 is the exact
+  failure the code distinguishes — a project with an empty `_STACK.md` would otherwise finish green
+  having verified nothing.
 - **Log friction as you go** to `.tasks/<id>/FRICTION.md` — it feeds the harness-improver.
 - Keep `CHECKLIST.md` current; it is how a fresh session resumes this run after compaction.
 - Report degradation honestly: a skipped RED gate, a `DIVERSITY: DEGRADED` review, an unreproducible
