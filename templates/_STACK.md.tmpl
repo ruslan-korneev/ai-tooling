@@ -26,6 +26,10 @@ RUN_CMD={{RUN_CMD}}
 `LINT_CMD=   # none: no linter in this toolchain, CI does not run one` and `doctor` reports the reason
 instead of a warning. Everything after ` # ` is a note, not part of the command.
 
+The reason changes the wording, not the verdict: an empty command is `SKIPPED` either way, and a gate
+where **nothing** ran exits `3` (DEGRADED) rather than `0`. Declaring that this toolchain has no linter
+is honest; it still means the run has no lint coverage to report.
+
 ## Repo facts
 
 ```ini

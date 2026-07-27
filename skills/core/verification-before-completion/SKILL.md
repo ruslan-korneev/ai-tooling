@@ -24,6 +24,8 @@ you saw*, you are not done — you are hopeful.
 ## Procedure
 
 1. Run the project's gates: `bash scripts/ai/gate.sh green` (static + tests, from `.tasks/_STACK.md`).
+   Read the exit code, not the absence of red: `0` passed · `1` failed · **`3` nothing ran**. A `3` means
+   this project has no checks configured, so "green" is a statement about nothing — report it as such.
 2. Run every check in `VALIDATION.md`; save what you observed to `.tasks/<id>/evidence/`.
 3. For a bug fix: confirm the **reproduction** now fails to reproduce. A fix without a before/after
    observation is a guess that happened to compile.

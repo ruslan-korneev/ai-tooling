@@ -16,6 +16,8 @@
 #   gate.sh all <id>               plan + green + evidence
 #
 # Exit 0 = gate passed. Exit 1 = gate failed. Exit 2 = misuse/misconfiguration.
+# Exit 3 = DEGRADED: the gate never ran a single check, so it verified nothing. Not a pass, not a
+#          failure — the run continues, but the summary and the PR must say what was not verified.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,12 +44,27 @@ gate_format() {
   adw_run_cmd format "$fmt"
 }
 
+# Exit 3 (DEGRADED) when not one of the three ran: "nothing was verified" is a third outcome, and
+# collapsing it into 0 is how a project with an empty _STACK.md produces a green run over no checks.
+# A partial skip still passes — something did run — but it is reported, because the PR has to say so.
 gate_static() {
-  local fail=0
-  adw_run_cmd format-check "$(adw_cfg FORMAT_CHECK_CMD)" || fail=1
-  adw_run_cmd lint         "$(adw_cfg LINT_CMD)"         || fail=1
-  adw_run_cmd typecheck    "$(adw_cfg TYPECHECK_CMD)"    || fail=1
-  return $fail
+  local fail=0 ran=0 skipped="" rc pair label key
+  for pair in format-check:FORMAT_CHECK_CMD lint:LINT_CMD typecheck:TYPECHECK_CMD; do
+    label="${pair%%:*}"; key="${pair#*:}"
+    adw_run_cmd "$label" "$(adw_cfg "$key")" "$key"; rc=$?
+    case $rc in
+      0)              ran=$(( ran + 1 )) ;;
+      "$ADW_SKIPPED") skipped="$skipped $label" ;;
+      *)              ran=$(( ran + 1 )); fail=1 ;;
+    esac
+  done
+  (( fail )) && return 1
+  if (( ran == 0 )); then
+    adw_warn "DEGRADED: static — no check ran (${skipped# }). That is not a pass; report it as NOT VERIFIED."
+    return $ADW_SKIPPED
+  fi
+  [[ -n "${skipped// }" ]] && adw_log "static: $ran check(s) ran; never configured:$skipped"
+  return 0
 }
 
 test_command() {
@@ -60,7 +77,7 @@ test_command() {
   fi
 }
 
-gate_test() { adw_run_cmd test "$(test_command "${1:-}")"; }
+gate_test() { adw_run_cmd test "$(test_command "${1:-}")" TEST_CMD; }
 
 # A test can fail for the wrong reason, or pass for no reason at all. Running the new tests against the
 # BASE branch catches the second: a test that is already green without the feature asserts nothing, and
@@ -136,10 +153,22 @@ gate_red() {
 }
 
 gate_green() {
-  local fail=0
-  gate_static || fail=1
-  gate_test "${1:-}" || fail=1
-  return $fail
+  local fail=0 static_rc test_rc
+  gate_static;              static_rc=$?
+  gate_test "${1:-}";       test_rc=$?
+  (( static_rc == 1 )) && fail=1
+  (( test_rc   == 1 )) && fail=1
+  (( fail )) && return 1
+
+  if (( static_rc == ADW_SKIPPED && test_rc == ADW_SKIPPED )); then
+    adw_warn "DEGRADED: green — no static check and no suite ran. Nothing about this diff was verified;"
+    adw_warn "     GREEN here means 'we looked at nothing'. Configure .tasks/_STACK.md or rely on"
+    adw_warn "     observation checks in VALIDATION.md, and say which in the PR's 'Not verified' section."
+    return $ADW_SKIPPED
+  fi
+  (( static_rc == ADW_SKIPPED )) && adw_warn "green: PARTIAL — the suite ran, no static check did. List it under 'Not verified'."
+  (( test_rc   == ADW_SKIPPED )) && adw_warn "green: PARTIAL — static checks ran, no suite did. List it under 'Not verified'."
+  return 0
 }
 
 require_task() { [[ -n "${1:-}" ]] || adw_die "usage: gate.sh $cmd <task-id>"; [[ -d ".tasks/$1" ]] || adw_die "no such task workspace: .tasks/$1"; }
@@ -396,7 +425,13 @@ case "$cmd" in
   committed) gate_committed ;;
   ready)     require_task "${1:-}"; gate_ready "$1" ;;
   evidence)  require_task "${1:-}"; gate_evidence "$1" ;;
-  all)      require_task "${1:-}"; rc=0; gate_plan "$1" || rc=1; gate_green || rc=1; gate_evidence "$1" || rc=1; exit $rc ;;
+  all)      require_task "${1:-}"; rc=0
+            gate_plan "$1" || rc=1
+            gate_green; green_rc=$?
+            (( green_rc == 1 )) && rc=1
+            (( green_rc == ADW_SKIPPED && rc == 0 )) && rc=$ADW_SKIPPED   # degraded survives, failure wins
+            gate_evidence "$1" || rc=1
+            exit $rc ;;
   ""|-h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
   *) adw_die "unknown gate: $cmd" ;;
 esac

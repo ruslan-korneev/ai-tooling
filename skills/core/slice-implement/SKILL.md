@@ -83,8 +83,9 @@ commit as the step it describes.
 
 ## 3 · Validate + evidence
 
-- `bash scripts/ai/gate.sh green` clean, then run **every** check in `VALIDATION.md`, saving evidence to
-  `.tasks/<id>/evidence/`. Confirm with `bash scripts/ai/gate.sh evidence <id>`.
+- `bash scripts/ai/gate.sh green` clean (exit 0 — **not** exit 3, which means no check ran and nothing was
+  verified), then run **every** check in `VALIDATION.md`, saving evidence to `.tasks/<id>/evidence/`.
+  Confirm with `bash scripts/ai/gate.sh evidence <id>`.
 - Shared or manual resources (one staging slot, one device, a paid budget) go **through the operator**:
   say what you need, stop, wait for their go. Never seize, restart, or repoint a shared resource.
 - Do not open the PR with red or unrun checks.

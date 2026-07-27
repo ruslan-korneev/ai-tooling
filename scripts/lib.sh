@@ -32,12 +32,24 @@ adw_log()  { printf '[adw] %s\n' "$*" >&2; }
 adw_warn() { printf '[adw] WARN: %s\n' "$*" >&2; }
 adw_die()  { printf '[adw] ERROR: %s\n' "$*" >&2; exit 2; }
 
-# adw_run_cmd <label> <command-string> — run a configured command; empty => SKIPPED, exit 0.
+# A check that never ran is not a check that passed. Reporting both as 0 makes a project with nothing
+# configured indistinguishable from one where everything ran clean — which is the same failure the
+# engine probe exists to prevent ("installed does not mean usable"), one layer down.
+ADW_SKIPPED=3
+
+# adw_run_cmd <label> <command-string> [config-key] — run a configured command.
+# Exit: 0 ran and passed · the command's own code if it ran and failed · 3 never ran.
+# The config key, when given, is only used to quote the reason the operator wrote for leaving it empty.
 adw_run_cmd() {
-  local label="$1" cmd="$2"
+  local label="$1" cmd="$2" key="${3:-}" note=""
   if [[ -z "${cmd// }" ]]; then
-    adw_log "$label: SKIPPED (not configured in .tasks/_STACK.md)"
-    return 0
+    [[ -n "$key" ]] && note="$(adw_cfg_note "$key")"
+    if [[ -n "${note// }" ]]; then
+      adw_log "$label: SKIPPED — declared none in .tasks/_STACK.md ($note)"
+    else
+      adw_log "$label: SKIPPED (${key:-it} is not configured in .tasks/_STACK.md)"
+    fi
+    return $ADW_SKIPPED
   fi
   adw_log "$label: $cmd"
   bash -c "$cmd"

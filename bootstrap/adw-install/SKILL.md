@@ -84,13 +84,18 @@ Keep it to what actually changes behaviour:
 ## 6 · Verify — do not declare success from a file listing
 
 ```bash
-bash scripts/ai/gate.sh static      # must exit 0, or report exactly what failed
+bash scripts/ai/gate.sh static      # 0 = ran and passed · 1 = something failed · 3 = nothing ran
 bash ~/.config/ai-tooling/install.sh doctor .
 ```
 
-Report honestly: which gates ran, which are `SKIPPED (not configured)` and why, engine diversity, and
-whether hooks were registered. An install with three skipped gates is a valid outcome — silently calling
-it ready is not.
+**Exit 3 is the one to read carefully.** It means no check was configured, so the gate verified nothing —
+the most likely outcome of a fresh install, and the one that looks like success if you only skim. Go back
+and work out this project's real commands rather than accepting it.
+
+Report honestly: which gates ran, which are `SKIPPED` and why, engine diversity, and whether hooks were
+registered. An install where a check genuinely does not exist in this toolchain is a valid outcome —
+write the reason next to the empty value (`LINT_CMD=   # none: no linter for Luau`) so the gate quotes it
+back instead of reporting a missing config. Silently calling a degraded install ready is not.
 
 ## 7 · Offer the PR
 

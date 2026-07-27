@@ -25,7 +25,7 @@
 set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 die() { echo "[ai-tooling] ERROR: $*" >&2; exit 1; }
@@ -336,6 +336,7 @@ cmd_install() {
     1. fill in .tasks/_STACK.md (check kit, canon, shared resources)
     2. confirm which engines actually work:  bash scripts/ai/engines.sh probe --write
     3. verify the gates:  cd $TARGET && bash scripts/ai/gate.sh static
+       exit 3 = DEGRADED: nothing is configured yet, so the gate verified nothing. Go back to 1.
     4. run a task:        /adw-run <what you want built>
 EOF
 }
