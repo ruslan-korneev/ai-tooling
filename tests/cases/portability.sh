@@ -34,10 +34,16 @@ check_xfail 'core scripts avoid bash-4-only constructs' 0 bash4_free
 # GNU-only tools are the other half of the same problem: absent from a stock macOS, so a script that
 # reaches for one works on CI and dies on the operator's laptop. `timeout` is not in this list on
 # purpose — engines.sh implements its own `with_timeout` rather than shelling out to coreutils.
+# Comments and double-quoted strings are stripped first, so naming a tool in a warning ("no
+# shasum/sha256sum/openssl here") is not a use of it. A line that tests for the tool with `command -v`
+# before calling it is the documented way to reach for one anyway — it degrades with a message instead
+# of dying — so those lines are compliant too.
+# Blind spot, accepted: a genuine call hidden inside a double-quoted command string is invisible here.
 gnu_free() {
   local hits
-  hits="$(grep -nE '(^|[^[:alnum:]_-])(realpath|sha256sum|tac|readlink -f|date -d|stat -c|grep -P|xargs -r)([^[:alnum:]_-]|$)' \
-          "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh)" || return 0
+  hits="$(sed -E 's/"[^"]*"//g; s/#.*$//' "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh \
+          | grep -nE '(^|[^[:alnum:]_-])(realpath|sha256sum|tac|readlink -f|date -d|stat -c|grep -P|xargs -r)([^[:alnum:]_-]|$)' \
+          | grep -v 'command -v')" || return 0
   printf '%s\n' "$hits"
   return 1
 }

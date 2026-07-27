@@ -46,9 +46,33 @@ configured with a command that errors reports `SKIPPED` while the loop looks gre
 bash ~/.config/ai-tooling/install.sh install /path/to/project     # stack auto-detected
 bash ~/.config/ai-tooling/install.sh install . --stack python
 bash ~/.config/ai-tooling/install.sh install . --no-hooks         # skip the on-edit format hook
-bash ~/.config/ai-tooling/install.sh doctor .                     # drift, unset commands, engines
+bash ~/.config/ai-tooling/install.sh doctor .                     # version delta, drift, unset commands
 bash ~/.config/ai-tooling/install.sh uninstall .                  # removes generated copies, keeps .tasks/
 ```
+
+## Upgrading an install
+
+The core is copied into each project, so a change here does not reach them on its own. `upgrade` takes
+them forward:
+
+```bash
+bash ~/.config/ai-tooling/install.sh upgrade /path/to/project           # one project
+bash ~/.config/ai-tooling/install.sh upgrade /path/to/project --dry-run # classify, write nothing
+bash ~/.config/ai-tooling/install.sh upgrade --all                      # every project ever installed
+bash ~/.config/ai-tooling/install.sh installs                           # which ones, and at what version
+```
+
+It re-applies the shape the project was installed with — stack, tools, skills, hooks — read back from
+`.ai-tooling.json`. Changing that shape is a re-install, deliberately.
+
+The distinction that makes it safe: the manifest records a **hash per installed file**, so an upgrade
+can tell a copy that is merely out of date from one this project edited. Untouched copies are replaced
+silently; an edited one is reported and **kept**, and stays kept across later upgrades, until you pass
+`--force`. An edited core file is either a local fix worth upstreaming or drift worth discarding, and
+only you know which — so the exit code is non-zero while any are outstanding.
+
+`.tasks/_STACK.md` is never regenerated. `VERSION` in `install.sh` moves with every core change, which
+is what lets `doctor` and `installs` report which projects are behind.
 
 Then, once per project:
 
