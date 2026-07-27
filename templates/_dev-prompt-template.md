@@ -6,7 +6,7 @@ session gets no prior conversation.
 
 ```
 Implement <id> (<name>). Plan: .tasks/<id>/PLAN.md. Rules: AGENTS.md. Check kit: .tasks/_STACK.md.
-Profile: <light|standard|deep>.
+Profile: <superlight|light|standard|deep>.
 
 BRANCH: <id>-<slug>   (worktree: yes)
 

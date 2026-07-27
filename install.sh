@@ -25,7 +25,7 @@
 set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="2.1.0"
+VERSION="2.2.0"
 SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 die() { echo "[ai-tooling] ERROR: $*" >&2; exit 1; }
@@ -53,7 +53,7 @@ cmd_list() {
   echo "Gates (scripts/ai/):"
   echo "  gate.sh    format|static|test|red|green|workspace|committed|groom|plan|evidence|ready|all"
   echo "  guard.sh   builder|test-author|reviewer|planner   (phase file-scope, mechanical)"
-  echo "  review.sh  <round> [validation] --profile light|standard|deep   (lens fan-out + judge)"
+  echo "  review.sh  <round> [validation] --profile superlight|light|standard|deep   (fan-out + judge)"
   echo "  intake.sh  fetch <ref>|writeback <ref> --status|--comment|contract"
   echo "  engines.sh candidates|probe --write|list|pick-review|diversity|run"
   echo "  setup-worktree.sh · worktree-alloc.sh"

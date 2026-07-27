@@ -59,7 +59,10 @@ the wrong place.
   `GROOM_LOG.md`, `evidence/`, `FRICTION.md` as the work warrants. `.tasks/` is **committed** — it is the
   provenance record and how a fresh session resumes after compaction.
 - A `blocker` in `OPEN_QUESTIONS.md` is a **STOP** signal: surface it and pause. Never guess past it.
-- Profile (`light`/`standard`/`deep`) is chosen from blast radius by `workflow-triage`, not from diff size.
+- Profile (`superlight`/`light`/`standard`/`deep`) is chosen from blast radius by `workflow-triage`, not
+  from diff size — or named by the operator (`/adw-run light SM-12`), in which case it is a decision.
+  The profile is the phase list: below `standard` there is no scout, no groom agent and no G2 stop. The
+  worktree, the draft PR, `gate.sh green`, `gate.sh evidence` and one reviewer never scale down.
 
 ### Agent identities are defined by what they may not touch
 

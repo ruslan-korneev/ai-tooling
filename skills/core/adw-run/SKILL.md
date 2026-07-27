@@ -1,6 +1,8 @@
 ---
 name: adw-run
-description: Drive the full AI Developer Workflow for one task end to end — intake, triage, scout, plan, groom passes, worktree, RED/GREEN implementation, validation, review fan-out — pausing only at the human gates (plan approval and final review). Use when the operator says "run the workflow", "прогони воркфлоу", "take this task through the loop", or hands over a ticket id and expects the whole loop.
+description: Drive the AI Developer Workflow for one task end to end — intake, triage, scout, plan, groom passes, worktree, RED/GREEN implementation, validation, review fan-out — at the depth the task earns, pausing only at the human gates it earns. Use when the operator says "run the workflow", "прогони воркфлоу", "take this task through the loop", or hands over a ticket id and expects the whole loop.
+arguments: [profile, ref]
+argument-hint: "[superlight|light|standard|deep] [ticket-ref]"
 ---
 
 # adw-run — the orchestrator of one task through the loop
@@ -9,40 +11,108 @@ You drive the whole loop for a single task. You do not write production code you
 enforce gates mechanically, and spawn specialist agents whose identities are defined by what they may not
 touch. Everything project-specific comes from `.tasks/_STACK.md`; never hardcode a command.
 
-## Human gates (only two — protect them)
+## Arguments
+
+`$profile` — `superlight` · `light` · `standard` · `deep`, when the operator names one. Empty means
+they did not, and `workflow-triage` picks. A named profile is a decision, not a hint: record it and
+run it. Escalate mid-run only for the reasons in `workflow-triage`, and say so when you do.
+
+`$ref` — the ticket id or the request itself, handed straight to `task-intake`.
+
+## Human gates (at most two — protect the ones the profile keeps)
 
 - **G2 · plan approval.** After the plan and validation criteria exist and grooming converged, present a
   compact summary and **stop for the operator**. This is the highest-leverage review point: a bad plan
-  line becomes hundreds of bad code lines.
-- **G7 · merge.** After the review fan-out, present the ranked findings and **stop**. Merging is theirs.
+  line becomes hundreds of bad code lines. **`standard` and `deep` only** — below those the plan is a
+  dozen lines the operator would rubber-stamp, and a gate that gets rubber-stamped trains them to skim
+  the one that matters.
+- **G7 · merge.** After the review, present the ranked findings and **stop**. Merging is theirs, at
+  every profile.
 
 Everywhere else you proceed autonomously — **except** on a `blocker`, which always stops the run.
+
+## What each profile actually runs
+
+The profile is not a label on a run that happens anyway; it *is* the phase list. Read this table before
+phase 1 and run only the column you are in.
+
+| Phase | `superlight` | `light` | `standard` / `deep` |
+| --- | --- | --- | --- |
+| 0 · triage | skip — profile is explicit | skip if explicit | `workflow-triage` |
+| 1 · scout | skip, read the files yourself | skip, read the files yourself | `context-scout` agent |
+| 2 · plan | `PLAN.md` ~12 lines + `VALIDATION.md`, 1 check | short but complete | full |
+| 2 · `OPEN_QUESTIONS.md` / `CHECKLIST.md` | only if a blocker appears | yes | yes |
+| 3 · groom | **skip** | one inline `contracts` pass, no agent | one agent per lens |
+| 3 · `GROOM_LOG.md` | not created | created | created |
+| 4 · **G2** | skip | skip | **stop** |
+| 5 · workspace | worktree + branch + draft PR | same | same |
+| 6 · RED | one test where `TEST_CMD` exists, else observation | optional | required |
+| 7 · GREEN + `gate.sh green` | required | required | required |
+| 8 · validate + `gate.sh evidence` | required | required | required |
+| 9 · review | `review.sh --profile superlight` (1 reviewer) | 1 reviewer | fan-out + wildcard (+ judge) |
+| 10 · **G7** | **stop** | **stop** | **stop** |
+
+Two rows never move, whatever the profile. **The workspace** — worktree, branch, draft PR — is
+script-driven and takes seconds, and it is what makes a run revertible in one command and visible while
+it happens; cutting it saves nothing measurable and loses everything if the session dies. **One
+reviewer** — without it a small run is a solo run that awards itself a green tick, and one agent is the
+cheapest independent look at a diff there is.
+
+`superlight` still writes `PLAN.md` and `VALIDATION.md` because the gates read them: `gate.sh plan`
+wants the four headers (`Touches`, `Depends-on`, `Out of scope`, `Decisions locked`) and one numbered
+check, `gate.sh evidence` wants one evidence file. On a task this size three of those headers are one
+word long. Nothing in `gate.sh` is skipped or special-cased for it.
+
+## When not to run this at all
+
+The harness has a floor. A typo, a version bump, a comment fix, a one-line config change with an
+observable result: do it in the session, run `bash scripts/ai/gate.sh green`, and let the operator read
+the diff. `workflow-triage` will honestly answer `superlight` for a one-liner, because it reasons about
+blast radius and a one-liner has none — that is not a recommendation to spend a worktree and a PR on it.
+
+Below the floor the cost is not the tokens, it is the operator's attention: a PR that says nothing
+teaches them to stop reading PRs.
 
 ## Phases
 
 ### 0 · Intake + triage
 1. `task-intake` — turn the request (ticket / prompt / bug report) into `.tasks/<id>/` with the goal and a
    back-reference to its source.
-2. `workflow-triage` — pick the profile (`light` / `standard` / `deep`) and record it in `PLAN.md`.
-   Never ask the operator for the profile; state your choice and its reason in one line.
+2. `workflow-triage` — pick the profile and record it in `PLAN.md`. **Skip this when `$profile` was
+   given**; write the operator's choice into `PLAN.md` instead, marked as theirs. Never ask them to
+   choose when they did not: state your reasoning in one line and let them override.
 
-### 1 · Scout (agent: `context-scout`)
+### 1 · Scout (agent: `context-scout`) — `standard` / `deep`
 Read-only recon → provenance index. It burns its own context on grep/read/trace and returns conclusions,
 so your context stays clean and the plan is not anchored on the first file anyone opened.
+Below `standard` you read the files yourself: the agent's whole value is protecting a context you are
+not going to fill on a task this size.
 
 ### 2 · Plan (`task-plan` + `slice-verify`)
 `PLAN.md` (incl. `Touches` / `Depends-on` / scope OUT / decisions locked) and `VALIDATION.md` (every
 acceptance line → ≥1 runnable check, with where evidence lands). Uncertainties → `OPEN_QUESTIONS.md`.
 
-### 3 · Groom passes (`groom-harden`, agent: `groom-hardener`)
+On `superlight` this is a dozen lines: the four headers `gate.sh plan` requires, three of them one word
+long, and one numbered check. Short is the point — but the headers are not optional, because a task with
+no stated scope OUT is a task that grows silently.
+
+### 3 · Groom passes (`groom-harden`, agent: `groom-hardener`) — `light` and up
 **One fresh-context pass per lens** from `LENSES` in `_STACK.md` — the lens set is the coverage. Each pass
 reads `GROOM_LOG.md` first and appends its row. A lens that reports blockers or majors re-runs **after its
 findings are folded in**; minors are recorded and never trigger another pass.
 Check mechanically: `bash scripts/ai/gate.sh groom <id>`.
 
-### 4 · G2 — stop for the operator
+`light` runs the first lens inline, in this session, without spawning `groom-hardener` — one lens does
+not need a fresh context to stay honest, and the agent's cost is the context it rebuilds.
+`superlight` skips grooming entirely; `gate.sh groom` requires no lens there and passes on the blocker
+check alone.
+
+### 4 · G2 — stop for the operator — `standard` / `deep`
 Present: goal, scope IN/OUT, the 3–5 decisions locked, open `clarify` assumptions, the check list, the
 profile, and the estimated tier count. Wait. Fold their corrections back into the artifacts.
+
+Skipped below `standard`. Not because the plan matters less, but because a twelve-line plan is one the
+operator approves without reading, and a gate that gets rubber-stamped devalues the one that must not.
 
 ### 5 · Workspace — before any code
 Worktree, branch, empty start commit, push, **draft PR** — in that order, before a single source file is
@@ -75,6 +145,10 @@ Tests first, written by an agent that may not touch source (`guard.sh test-autho
 not an import error. No test command configured → say so plainly, skip RED, and rely on observation
 checks; do not pretend TDD happened.
 
+On `superlight` and `light` the test-author agent is overhead: write the one failing test yourself, then
+run the same gate. The guard exists so an implementer cannot bend a test to fit; when you are about to
+write both, the honest substitute is writing the test first and not touching it afterwards.
+
 ### 7 · GREEN (agent: `builder`)
 Builder receives the plan, the tests, and the signatures — not the grooming history. It may not touch test
 paths (`guard.sh builder`). Gate: `bash scripts/ai/gate.sh green`. **Cap 3 fix attempts per failing gate**;
@@ -92,12 +166,13 @@ view of the run — an uncommitted step is invisible to the operator and lost if
 Run every `VALIDATION.md` check, save evidence to `.tasks/<id>/evidence/`.
 Gate: `bash scripts/ai/gate.sh evidence <id>`. Do not open a PR with red or unrun checks.
 
-### 9 · Review fan-out
+### 9 · Review
 Fill in the PR summary + how-to-verify (including the "Not verified" section), `gh pr ready`, and confirm
 with `bash scripts/ai/gate.sh ready <id>` — the run marks its own PR ready, not the operator. Then
-`bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <profile>` —
-lens reviewers in parallel, plus a wildcard hunting what those lenses cannot see, plus (on `deep`) a judge
-that dedupes and adversarially verifies. In parallel, run `harness-improver` on the diff + `FRICTION.md`.
+`bash scripts/ai/review.sh <round> .tasks/<id>/VALIDATION.md --profile <profile>` — pass the profile you
+actually ran, so the fan-out matches it: one reviewer below `standard`, lens reviewers in parallel above,
+plus a wildcard hunting what those lenses cannot see and a judge that dedupes and adversarially verifies.
+In parallel, run `harness-improver` on the diff + `FRICTION.md`.
 
 ### 10 · G7 — stop for the operator
 Present the ranked, verified findings, the diversity label, **and what was never verified** — NOT RUN

@@ -124,13 +124,26 @@ three are printed by every run, and `tests/run.sh` ends by naming the surface it
 
 ## Profiles — right-size the loop
 
-`workflow-triage` picks from **blast radius**, not diff size, and can escalate mid-run.
+`workflow-triage` picks from **blast radius**, not diff size, and can escalate mid-run. The operator can
+name one instead — `/adw-run superlight`, `/adw-run deep SM-12` — and then it is a decision, not a hint.
 
-| | `light` | `standard` | `deep` |
-| --- | --- | --- | --- |
-| Groom | 1 pass | loop-until-dry, 2 lenses | loop-until-dry, all lenses |
-| Review | 1 reviewer | 3 lenses + wildcard | all lenses + wildcard + judge |
-| Human gates | G7 | G2 + G7 | G2 + G7 |
+| | `superlight` | `light` | `standard` | `deep` |
+| --- | --- | --- | --- | --- |
+| Scout | skip | skip | agent | agent, multi-angle |
+| Groom | **none** | 1 lens, inline | 2 lenses | all lenses |
+| Review | 1 reviewer | 1 reviewer | 3 lenses + wildcard + judge | all lenses + wildcard + judge |
+| Human gates | G7 | G7 | G2 + G7 | G2 + G7 |
+
+The profile **is** the phase list — `adw-run` runs one column, not the whole loop with cheaper settings.
+What never scales down: the worktree, the draft PR, `gate.sh green`, `gate.sh evidence`, and one
+reviewer. A run with no independent look at the diff is a solo run awarding itself a green tick.
+
+`superlight` still writes `PLAN.md` and `VALIDATION.md`, because the gates read them — around a dozen
+lines, three of the four required headers one word long. No gate is skipped or special-cased for it.
+
+**And there is a floor.** A typo, a version bump, a comment fix: do it in the session, run
+`gate.sh green`, show the diff. Blast radius says `superlight` for a one-liner; that is not a reason to
+spend a worktree and a PR on it. Below the floor the cost is the operator's attention, not the tokens.
 
 ## Agent identities = what they may not touch
 

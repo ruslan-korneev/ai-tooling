@@ -11,7 +11,13 @@ BASE_BRANCH=main
 INI
 
 check     'unknown profile → misuse (exit 2)'          2 review "$repo" 1 --profile bogus
-check_out 'and it lists the profiles that exist' 'light|standard|deep' review "$repo" 1 --profile bogus
+check_out 'and it lists the profiles that exist' 'superlight|light|standard|deep' \
+  review "$repo" 1 --profile bogus
+
+# superlight is a real profile, not an unknown one: it must get past profile resolution and fail on the
+# next thing (the missing rubric), never on its own name.
+check_out 'superlight is recognised, and stops at the rubric instead' 'rubric' \
+  review "$repo" 1 --profile superlight
 
 # Without the rubric there is nothing to review against, and a reviewer with no rubric returns
 # plausible prose. Refusing is the only safe answer.

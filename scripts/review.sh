@@ -2,8 +2,9 @@
 # scripts/ai/review.sh — review fan-out: one reviewer per rubric lens + a wildcard, run in parallel,
 # then a judge that dedupes and adversarially verifies. Core file.
 #
-#   review.sh <round> [validation-path] [--profile light|standard|deep] [--lenses a,b,c]
+#   review.sh <round> [validation-path] [--profile superlight|light|standard|deep] [--lenses a,b,c]
 #
+# superlight → same as light: one reviewer is the floor, not something a profile can drop
 # light    → 1 reviewer, no wildcard, no judge
 # standard → 3 lenses + wildcard, no judge (raw findings)
 # deep     → all configured lenses + wildcard + judge (deduped, verified, ranked)
@@ -34,12 +35,14 @@ profile="${profile:-$(adw_cfg DEFAULT_PROFILE standard)}"
 lenses="${lenses:-$(adw_cfg REVIEW_LENSES correctness,security,performance,architecture,tests)}"
 
 case "$profile" in
-  light)    IFS=',' read -ra lens_list <<< "correctness"; wildcard=0; judge=0 ;;
+  # One reviewer is the floor. A run with none is a solo run awarding itself a green tick, and the
+  # cheapest independent look at a diff is one agent — so superlight buys a smaller loop, not no review.
+  superlight|light) IFS=',' read -ra lens_list <<< "correctness"; wildcard=0; judge=0 ;;
   # wildcard + judge stay on at standard: on the evidence, the majors come from the adversarial angle,
   # and an unjudged fan-out hands the operator six overlapping lists instead of one verified one.
   standard) IFS=',' read -ra all <<< "$lenses"; lens_list=("${all[@]:0:3}"); wildcard=1; judge=1 ;;
   deep)     IFS=',' read -ra lens_list <<< "$lenses"; wildcard=1; judge=1 ;;
-  *) adw_die "unknown profile: $profile (light|standard|deep)" ;;
+  *) adw_die "unknown profile: $profile (superlight|light|standard|deep)" ;;
 esac
 
 rubric_file=""
