@@ -20,7 +20,8 @@ The ledger is what keeps passes moving forward instead of re-deriving the same t
 ## Lenses (one per pass, rotating)
 
 From `LENSES` in `.tasks/_STACK.md` — the four core ones, plus any domain lenses the project added. The
-profile decides how many run: `light` → `contracts`; `standard` → `contracts` + `adversary`; `deep` → all.
+profile decides how many run: `superlight` → none at all; `light` → `contracts`, run inline in the
+session rather than by an agent; `standard` → `contracts` + `adversary`; `deep` → all.
 
 1. **contracts** — every API/event/persisted contract the slice introduces or touches: source of truth,
    payload shape, writers/readers, validation, versioning, forbidden writes. Ownership ambiguity between

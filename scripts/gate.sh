@@ -179,19 +179,31 @@ gate_groom() {
     adw_warn "G1 FAILED: open blocker in $oq — STOP, resolve with the operator."
     fail=1
   fi
-  if [[ ! -f "$log" ]]; then
-    adw_warn "G1 FAILED: $log missing — run groom-harden at least once."
-    return 1
-  fi
   # The lens set IS the coverage. Every lens gets one pass; a lens is repeated only if it found something
   # major, and then only that lens. Counting "quiet passes" instead rewards re-running the same questions:
   # on a real run, passes 5 and 6 produced three minors and no majors, for a third of the token budget.
   local lenses lens closed missing="" profile all_lenses
   all_lenses="$(adw_cfg LENSES contracts,failure-modes,adversary,meta | tr ',' ' ')"
   # The profile decides how much coverage this task earns; PLAN.md records it (workflow-triage).
+  # 'superlight' has to be IN the alternation, or "**Profile:** superlight" matches the 'light' inside it
+  # and the run is silently groomed as light. Order does not matter — ERE is leftmost-longest, so both
+  # alternatives start at the same offset and the longer one wins either way.
   profile="$(grep -m1 -iE '^\s*[-*]?\s*\*\*Profile:\*\*' ".tasks/$id/PLAN.md" 2>/dev/null \
-             | grep -oiE 'light|standard|deep' | head -1 | tr '[:upper:]' '[:lower:]')"
+             | grep -oiE 'superlight|light|standard|deep' | head -1 | tr '[:upper:]' '[:lower:]')"
   profile="${profile:-$(adw_cfg DEFAULT_PROFILE standard)}"
+
+  # superlight runs no groom pass, so there is no ledger to demand — but the blocker check above still
+  # applies, because a blocker found while planning stops the run at every profile.
+  if [[ "$profile" == "superlight" ]]; then
+    adw_log "G1: profile 'superlight' → no groom pass required"
+    (( fail )) || adw_log "G1 OK: no open blocker"
+    return $fail
+  fi
+
+  if [[ ! -f "$log" ]]; then
+    adw_warn "G1 FAILED: $log missing — run groom-harden at least once."
+    return 1
+  fi
   case "$profile" in
     light)    lenses="$(printf '%s' "$all_lenses" | awk '{print $1}')" ;;
     standard) lenses="$(printf '%s\n' $all_lenses | grep -xE 'contracts|adversary' | tr '\n' ' ')"

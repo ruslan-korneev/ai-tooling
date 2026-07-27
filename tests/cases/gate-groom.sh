@@ -64,4 +64,21 @@ MD
 check     'open blocker → fail even with every lens clean' 1 gate "$repo" groom t-1
 check_out 'and it points at the file'  'OPEN_QUESTIONS.md' gate "$repo" groom t-1
 
+# ── superlight: no lens is required, and there is no ledger to demand ─────────
+# 'light' is a substring of 'superlight', so a profile parser that does not know the longer word reads
+# every superlight run as light and demands a groom pass that was never meant to happen.
+task "$repo" t-2
+plan_with_profile superlight > "$repo/.tasks/t-2/PLAN.md"
+check     'superlight: no GROOM_LOG.md at all → pass'  0 gate "$repo" groom t-2
+check_out 'and it says no pass was required' 'no groom pass required' gate "$repo" groom t-2
+
+cat > "$repo/.tasks/t-2/OPEN_QUESTIONS.md" <<'MD'
+## Blockers
+
+1. **Which store owns the balance?** Nobody could say.
+
+## Clarify
+MD
+check 'superlight: a blocker still stops the run' 1 gate "$repo" groom t-2
+
 done_tests

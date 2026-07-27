@@ -17,7 +17,8 @@ File: `.tasks/<id>/PLAN.md`
 ### (a) Overview — 10-second what/why/scale
 - **Type:** slice / feature / tech-task / bug / refactor / audit.
 - **Intake:** where this came from (ticket URL, operator prompt, bug report) — set by `task-intake`.
-- **Profile:** `light` / `standard` / `deep` + the one-line reason — set by `workflow-triage`.
+- **Profile:** `superlight` / `light` / `standard` / `deep` + the one-line reason — set by `workflow-triage`,
+  or by the operator, in which case say so (`operator's choice`).
 - **Crux** (2–3 sentences): what we're doing and why.
 - **Affected:** which layers/modules — be concrete for this codebase (API, domain, data/persistence,
   jobs, client/UI, infra, tooling).
