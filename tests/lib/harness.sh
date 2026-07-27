@@ -35,7 +35,7 @@ trap _cleanup EXIT
 
 fixture() {
   local name="${1:?usage: fixture <name>}" dir
-  [[ -n "$_tmp_root" ]] || _tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/adw-tests.XXXXXX")"
+  [[ -n "$_tmp_root" ]] || _tmp_root="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/adw-tests.XXXXXX")" && pwd)"
   dir="$_tmp_root/$name"
   mkdir -p "$dir/scripts/ai" "$dir/.tasks"
   cp "$ADW_ROOT"/scripts/*.sh "$dir/scripts/ai/"
@@ -61,6 +61,14 @@ stack() {
 task() {
   local dir="${1:?usage: task <dir> <id>}" id="${2:?usage: task <dir> <id>}"
   mkdir -p "$dir/.tasks/$id"
+}
+
+# A bare directory under the same throwaway root — for tests that need somewhere that is not a repo.
+tmpdir() {
+  local name="${1:?usage: tmpdir <name>}"
+  [[ -n "$_tmp_root" ]] || _tmp_root="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/adw-tests.XXXXXX")" && pwd)"
+  mkdir -p "$_tmp_root/$name"
+  printf '%s' "$_tmp_root/$name"
 }
 
 commit_all() { ( cd "$1" && git add -A && git commit -qm "${2:-step}" ) >/dev/null 2>&1; }
