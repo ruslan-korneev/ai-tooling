@@ -49,4 +49,26 @@ check_out 'and it names the offending test file'  'tests/probe.sh' gate "$taut" 
 # The same run with the base check disabled passes — which is why the skip is reported.
 check 'the same tautology slips through --no-base' 0 gate "$taut" red --no-base
 
+# The scratch worktree lives inside a mktemp -d. `git worktree remove` takes the worktree away and
+# leaves the directory that held it, so every RED gate used to leave one behind for the life of the
+# machine.
+#
+# TMPDIR is not usable to make this countable: BSD mktemp (macOS) ignores it and uses the per-user
+# _CS_DARWIN_USER_TEMP_DIR, so a TMPDIR-based fixture would watch an empty directory and pass no matter
+# what the code did — the same "skipped looks like passed" failure this suite exists to catch. So ask
+# mktemp itself where it writes, and diff the tmp.* entries there across the run.
+#
+# Race, accepted: another process may create a tmp.* directory during the run. That direction produces a
+# false FAILURE, never a false pass.
+leaves_no_tmpdir() {
+  local probe parent before after leaked
+  probe="$(mktemp -d)"; parent="$(dirname "$probe")"; rmdir "$probe"
+  before="$(find "$parent" -maxdepth 1 -type d -name 'tmp.*' 2>/dev/null | LC_ALL=C sort)"
+  ( cd "$taut" && bash scripts/ai/gate.sh red >/dev/null 2>&1 )
+  after="$(find "$parent" -maxdepth 1 -type d -name 'tmp.*' 2>/dev/null | LC_ALL=C sort)"
+  leaked="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+  [[ -z "${leaked// }" ]] || { printf 'left behind in %s:\n%s\n' "$parent" "$leaked"; return 1; }
+}
+check 'the RED/base check cleans up its temp directory' 0 leaves_no_tmpdir
+
 done_tests
