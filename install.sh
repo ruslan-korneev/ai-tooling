@@ -33,7 +33,7 @@
 set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="2.3.1"
+VERSION="2.3.2"
 SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 REGISTRY="${ADW_REGISTRY:-$HOME/.config/ai-tooling/installs}"
@@ -359,10 +359,10 @@ cmd_install() {
   local installed=()
   IFS=',' read -ra skill_list <<< "$SKILLS"
   IFS=',' read -ra tool_list <<< "$TOOLS"
-  for id in "${skill_list[@]}"; do
+  for id in ${skill_list[@]+"${skill_list[@]}"}; do
     id="$(echo "$id" | tr -d ' ')"
     [[ -d "$SRC/skills/core/$id" ]] || die "unknown skill: $id"
-    for tool in "${tool_list[@]}"; do
+    for tool in ${tool_list[@]+"${tool_list[@]}"}; do
       case "$tool" in
         claude) dest_root="$TARGET/.claude/skills/$id" ;;
         codex)  dest_root="$TARGET/.codex/skills/$id" ;;
@@ -398,7 +398,7 @@ cmd_install() {
   (( WITH_HOOKS )) && install_hooks
 
   if [[ "$DRY_RUN" != 1 ]]; then
-    write_manifest "${installed[@]}"
+    write_manifest ${installed[@]+"${installed[@]}"}
     register_install "$TARGET"
   fi
 
@@ -412,7 +412,7 @@ cmd_install() {
   if (( ${#ignored[@]} )); then
     info ""
     info "IGNORED BY GIT — these paths were written but git will not see them:"
-    for p in "${ignored[@]}"; do info "    $p   ($(cd "$TARGET" && git check-ignore -v "$p" 2>/dev/null | cut -d: -f1-2))"; done
+    for p in ${ignored[@]+"${ignored[@]}"}; do info "    $p   ($(cd "$TARGET" && git check-ignore -v "$p" 2>/dev/null | cut -d: -f1-2))"; done
     info "  Decide deliberately: commit the harness with 'git add -f <path>', or leave it untracked and"
     info "  know that a fresh clone of this repo has no harness. Half-tracked is the bad outcome."
   fi
@@ -496,10 +496,10 @@ PY
   local plan="" id tool a f rel
   IFS=',' read -ra _skills <<< "$SKILLS"
   IFS=',' read -ra _tools  <<< "$TOOLS"
-  for id in "${_skills[@]}"; do
+  for id in ${_skills[@]+"${_skills[@]}"}; do
     id="$(printf '%s' "$id" | tr -d ' ')"
     [[ -d "$SRC/skills/core/$id" ]] || { info "  GONE  skill '$id' no longer exists in the source — left in place"; continue; }
-    for tool in "${_tools[@]}"; do
+    for tool in ${_tools[@]+"${_tools[@]}"}; do
       case "$tool" in claude) rel=".claude/skills/$id" ;; codex) rel=".codex/skills/$id" ;; *) continue ;; esac
       while IFS= read -r f; do plan="$plan$SRC/skills/core/$id/$f	$rel/$f
 "; done < <(cd "$SRC/skills/core/$id" && find . -type f | sed 's|^\./||')
@@ -560,7 +560,7 @@ $SRC/templates/GROOM_LOG.md	.tasks/_templates/GROOM_LOG.md
   (( WITH_HOOKS )) && install_hooks
 
   IFS=',' read -ra _installed <<< "$SKILLS"
-  write_manifest "${_installed[@]}"
+  write_manifest ${_installed[@]+"${_installed[@]}"}
   register_install "$TARGET"
   info "  manifest updated → .ai-tooling.json (version $VERSION)"
   # Files left behind means the upgrade is not fully applied; --force leaves nothing behind.

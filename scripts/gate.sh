@@ -83,7 +83,7 @@ gate_test() { adw_run_cmd test "$(test_command "${1:-}")" TEST_CMD; }
 # BASE branch catches the second: a test that is already green without the feature asserts nothing, and
 # the implementer will happily write code "to satisfy" it.
 gate_red_against_base() {
-  local target="${1:-}" base cmd tmp rc out changed
+  local target="${1:-}" base cmd tmp tmp_parent rc out changed
   base="$(adw_cfg BASE_BRANCH main)"
   git rev-parse --verify "$base" >/dev/null 2>&1 || base="origin/$base"
   if ! git rev-parse --verify "$base" >/dev/null 2>&1; then
@@ -99,7 +99,12 @@ gate_red_against_base() {
   fi
 
   cmd="$(test_command "$target")"
-  tmp="$(mktemp -d)/base"
+  # `git worktree remove` takes the worktree away but not the mktemp -d that holds it. Removing the
+  # parent on every exit path — including the ones that return early below — is why this is a trap
+  # rather than an rm before each return.
+  tmp_parent="$(mktemp -d)"
+  trap 'rm -rf "${tmp_parent:?}"' RETURN
+  tmp="$tmp_parent/base"
   adw_log "RED/base: running the new tests against '$base' — they must fail there too"
   if ! git worktree add --detach -q "$tmp" "$base" 2>/dev/null; then
     adw_warn "RED/base: could not create a scratch worktree — skipping"; return 0

@@ -81,13 +81,18 @@ count=$(( ${#lens_list[@]} + wildcard ))
 engines=(); while IFS= read -r _line; do engines+=("$_line"); done < <("$here/engines.sh" pick-review "$count")
 usable=();  while IFS= read -r _line; do usable+=("$_line");  done < <("$here/engines.sh" list 2>/dev/null)
 
+# engines.sh writes its own diagnosis to stderr and exits, which leaves this array empty rather than
+# unset. Saying so here beats letting an array subscript deliver the news: the operator otherwise gets
+# the real reason followed by a bash "unbound variable", and on bash 3.2 the abort comes first.
+(( ${#engines[@]} )) || adw_die "no review engine available (see the error above). Fix with: bash scripts/ai/engines.sh probe --write"
+
 # run_lens <engine> <outfile> <prompt> — retries once on a different usable engine when output is empty
 # (an unauthenticated or rate-limited CLI fails silently; a missing lens must not look like a clean lens).
 run_lens() {
   local engine="$1" out="$2" prompt="$3" e
   printf '%s' "$prompt" | "$here/engines.sh" run "$engine" > "$out" 2>/dev/null
   if [[ ! -s "$out" ]]; then
-    for e in "${usable[@]}"; do
+    for e in ${usable[@]+"${usable[@]}"}; do
       [[ "$e" == "$engine" ]] && continue
       adw_warn "engine '$engine' returned nothing for $(basename "$out" .md) → retrying on '$e'"
       printf '%s' "$prompt" | "$here/engines.sh" run "$e" > "$out" 2>/dev/null
@@ -99,7 +104,7 @@ run_lens() {
 adw_log "round $round · profile $profile · ${#lens_list[@]} lens reviewer(s) + wildcard=$wildcard + judge=$judge · diversity=$diversity"
 
 pids=(); idx=0
-for lens in "${lens_list[@]}"; do
+for lens in ${lens_list[@]+"${lens_list[@]}"}; do
   engine="${engines[$idx]}"; out="$outdir/lens-$lens.md"
   prompt="$(printf '%s\n%s\n%s\n' "$base_rubric" "$(lens_block "$lens")" "$context_common")"
   {
@@ -112,7 +117,7 @@ done
 if (( wildcard )); then
   engine="${engines[$idx]}"; out="$outdir/lens-wildcard.md"
   prompt="$(printf '%s\n%s\n%s\n%s\n' "$base_rubric" "$(lens_block wildcard)" \
-    "The other reviewers on this diff cover exactly these lenses: ${lens_list[*]}. Anything inside them is THEIR job — do not duplicate it." \
+    "The other reviewers on this diff cover exactly these lenses: ${lens_list[*]-}. Anything inside them is THEIR job — do not duplicate it." \
     "$context_common")"
   {
     used="$(run_lens "$engine" "$out" "$prompt")"
@@ -121,13 +126,13 @@ if (( wildcard )); then
   pids+=($!)
 fi
 
-for p in "${pids[@]}"; do wait "$p" || true; done
+for p in ${pids[@]+"${pids[@]}"}; do wait "$p" || true; done
 
 findings_files=("$outdir"/lens-*.md)
 combined="$outdir/findings.md"
 {
   printf '# Review round %s — profile %s — diversity %s\n\n' "$round" "$profile" "$diversity"
-  for f in "${findings_files[@]}"; do
+  for f in ${findings_files[@]+"${findings_files[@]}"}; do
     [[ -s "$f" ]] || { adw_warn "empty output: $f"; continue; }
     printf '\n## %s\n\n' "$(basename "$f" .md)"; cat "$f"
   done
@@ -156,7 +161,7 @@ if [[ ! -s "$final" ]]; then adw_die "no reviewer output (all engines failed)"; 
 # Cost report — one row per engine call, plus a total. Reported even when partial.
 {
   printf '# Review round %s — cost\n\nprofile: %s · lenses: %s · wildcard: %s · judge: %s · diversity: %s\n' \
-    "$round" "$profile" "${lens_list[*]}" "$wildcard" "$judge" "$diversity"
+    "$round" "$profile" "${lens_list[*]-}" "$wildcard" "$judge" "$diversity"
   printf 'wall clock: %ss\n\n' "$(( $(date -u +%s) - start_ts ))"
   if [[ -s "$ADW_USAGE_FILE" ]]; then
     printf '| call | input | output | cache |\n| --- | --- | --- | --- |\n'

@@ -51,6 +51,40 @@ if [[ -x /bin/bash ]]; then
   check 'lower/upper and the mapfile replacement work under /bin/bash' 0 folds_under_32
 fi
 
+# Bash 3.2 aborts on "${arr[@]}" and "${arr[*]}" when the array is EMPTY and set -u is on — not a
+# warning, `unbound variable` and exit 127. Bash 4.4 made it legal, so this is invisible on Linux CI and
+# on any machine with Homebrew bash, and the lines themselves look perfectly portable. Grep alone would
+# have missed the class, which is why the runtime assertion below exists as well.
+#
+# The rule is blanket: every [@] expansion carries the `${arr[@]+"${arr[@]}"}` guard, every [*] carries
+# `-`. Whether a particular array can really be empty is a judgement no static check can make, and one
+# guard costs nothing.
+guarded_arrays() {
+  local hits
+  # The guarded form CONTAINS the bare one — ${a[@]+"${a[@]}"} — so strip the whole guarded construct
+  # first and flag whatever bare expansion is left over.
+  hits="$(code_lines "$ADW_ROOT"/scripts/*.sh "$ADW_ROOT"/install.sh \
+          | sed -E 's/\$\{[A-Za-z_][A-Za-z0-9_]*\[@\]\+"\$\{[A-Za-z_][A-Za-z0-9_]*\[@\]\}"\}//g' \
+          | grep -nE '"\$\{[A-Za-z_][A-Za-z0-9_]*\[[@*]\]\}"')" || return 0
+  printf '%s\n' "$hits"
+  return 1
+}
+check 'array expansions are guarded for the empty case' 0 guarded_arrays
+
+empty_arrays_under_32() {
+  /bin/bash -c 'set -uo pipefail
+    a=()
+    for e in ${a[@]+"${a[@]}"}; do :; done
+    printf "%s" "${a[*]-}" >/dev/null
+    (( ${#a[@]} )) && exit 1
+    b=(x y)
+    for e in ${b[@]+"${b[@]}"}; do :; done
+    [[ "$e" == y ]] || exit 1'
+}
+if [[ -x /bin/bash ]]; then
+  check 'the guarded forms survive an empty array under /bin/bash' 0 empty_arrays_under_32
+fi
+
 # GNU-only tools are the other half of the same problem: absent from a stock macOS, so a script that
 # reaches for one works on CI and dies on the operator's laptop. `timeout` is not in this list on
 # purpose — engines.sh implements its own `with_timeout` rather than shelling out to coreutils.

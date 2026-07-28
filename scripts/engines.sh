@@ -106,9 +106,9 @@ probe() {
     done
     # keep only the pinned entries when at least two answered: they are strictly more informative
     local pinned=(); local e
-    for e in "${usable[@]}"; do [[ "$e" == *:* ]] && pinned+=("$e"); done
+    for e in ${usable[@]+"${usable[@]}"}; do [[ "$e" == *:* ]] && pinned+=("$e"); done
     if (( ${#pinned[@]} >= 2 )); then
-      usable=("${pinned[@]}")
+      usable=(${pinned[@]+"${pinned[@]}"})
       adw_log "single vendor → pinned models probed and recorded (CROSS-MODEL, not DEGRADED)"
     fi
   fi
@@ -117,7 +117,7 @@ probe() {
     adw_warn "no usable engine. Reviews cannot run until at least one CLI is authenticated."
     return 1
   fi
-  local list; list="$(IFS=,; printf '%s' "${usable[*]}")"
+  local list; list="$(IFS=,; printf '%s' "${usable[*]-}")"
   printf '%s\n' "$list"
 
   if (( write )); then

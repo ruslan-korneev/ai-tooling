@@ -56,7 +56,7 @@ if (( ${#excluded[@]} )); then
   excl="$common_git/worktrees/$(basename "$root")/info/exclude"
   [[ -d "$(dirname "$excl")" ]] || excl="$common_git/info/exclude"
   mkdir -p "$(dirname "$excl")"
-  for entry in "${excluded[@]}"; do
+  for entry in ${excluded[@]+"${excluded[@]}"}; do
     grep -qxF "$entry" "$excl" 2>/dev/null || printf '%s\n' "$entry" >> "$excl"
   done
   adw_log "updated git exclude: $excl"
