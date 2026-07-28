@@ -17,7 +17,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 
 root="$(adw_repo_root)" || adw_die "not a git repo"
-cd "$root"
+cd "$root" || adw_die "cannot enter the repository root: $root"
 
 round="${1:-1}"; shift || true
 validation=""; profile=""; lenses=""

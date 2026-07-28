@@ -33,7 +33,7 @@
 set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="2.3.2"
+VERSION="2.3.3"
 SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 REGISTRY="${ADW_REGISTRY:-$HOME/.config/ai-tooling/installs}"
@@ -195,7 +195,7 @@ render_stack_md() {
     info "keep existing: .tasks/_STACK.md (project-owned; --regen-stack to overwrite)"; return 0
   fi
   if [[ -f "$out" && "$REGEN_STACK" == 1 ]]; then
-    local backup="$out.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+    local backup; backup="$out.bak-$(date -u +%Y%m%dT%H%M%SZ)"
     [[ "$DRY_RUN" == 1 ]] || cp "$out" "$backup"
     info "backed up existing config → ${backup#$TARGET/}"
   fi

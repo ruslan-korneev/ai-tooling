@@ -140,7 +140,9 @@ bash tests/run.sh gate-plan              # one
 ADW_TEST_SHELL=/bin/bash bash tests/run.sh   # under macOS's bash 3.2
 ```
 
-CI runs both on Linux and macOS. A case may declare a **known gap** — the behaviour we want, asserted
+CI runs both on Linux and macOS, plus `shellcheck -S warning` over every script (0 errors, 0 warnings;
+the 58 info and 58 style findings below that floor are backlog, not a silenced rule). shellcheck is not
+part of `tests/run.sh` — the suite needs only bash and git. A case may declare a **known gap** — the behaviour we want, asserted
 where the code does not deliver it yet. A known gap keeps the suite green and reports itself; the day
 it starts passing, the suite fails so the test gets promoted instead of quietly rotting. The current
 three are printed by every run, and `tests/run.sh` ends by naming the surface it does **not** cover

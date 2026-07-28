@@ -15,7 +15,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 
 root="$(adw_repo_root)" || adw_die "not a git repo"
-cd "$root"
+cd "$root" || adw_die "cannot enter the repository root: $root"
 
 common_git="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
   || adw_die "cannot resolve git common dir"
