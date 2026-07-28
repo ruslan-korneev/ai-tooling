@@ -328,7 +328,9 @@ gate_workspace() {
             | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null)"
     if [[ -z "${have// }" ]]; then
       adw_warn "G3: could not read the ticket state for $ref — move it by hand if it is still open."
-    elif [[ -n "${want// }" && "${have,,}" != "${want,,}" ]]; then
+    # `tr`, not ${x,,}: bash 3.2 — the /bin/bash macOS ships — aborts the whole script on that
+    # expansion with "bad substitution", so the gate dies instead of returning a verdict.
+    elif [[ -n "${want// }" && "$(lower "$have")" != "$(lower "$want")" ]]; then
       adw_warn "G3: ticket $ref is '$have', not '$want'. Move it now so nobody picks up the same work:"
       adw_warn "     bash scripts/ai/intake.sh writeback $ref --status start"
       fail=1

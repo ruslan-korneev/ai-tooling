@@ -290,7 +290,7 @@ writeback() {
     status)  tmpl="$(adw_cfg INTAKE_STATUS_CMD)" ;;
     comment) tmpl="$(adw_cfg INTAKE_COMMENT_CMD)" ;;
   esac
-  [[ -n "${tmpl// }" ]] || { adw_warn "no INTAKE_${kind^^}_CMD configured → skipping"; return 0; }
+  [[ -n "${tmpl// }" ]] || { adw_warn "no INTAKE_$(upper "$kind")_CMD configured → skipping"; return 0; }
 
   local resolved="${tmpl//<ref>/$ref}" cwd
   resolved="${resolved//<value>/$value}"

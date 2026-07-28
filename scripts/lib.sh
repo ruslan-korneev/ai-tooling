@@ -28,6 +28,12 @@ adw_cfg_note() {
     | grep -m1 -E "^${key}=" | grep -oE '#[[:space:]].*$' | sed -E 's/^#[[:space:]]*//'
 }
 
+# Case folding, portably. `${x,,}` and `${x^^}` need bash 4, and bash 3.2 does not merely ignore them:
+# it aborts the script with "bad substitution", so a gate using one returns no verdict at all on the
+# /bin/bash macOS ships. Everything here has to run on that shell.
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
+
 adw_log()  { printf '[adw] %s\n' "$*" >&2; }
 adw_warn() { printf '[adw] WARN: %s\n' "$*" >&2; }
 adw_die()  { printf '[adw] ERROR: %s\n' "$*" >&2; exit 2; }

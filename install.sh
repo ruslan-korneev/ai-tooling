@@ -33,7 +33,7 @@
 set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="2.3.0"
+VERSION="2.3.1"
 SCRIPT_FILES="lib.sh gate.sh guard.sh engines.sh intake.sh review.sh setup-worktree.sh worktree-alloc.sh"
 
 REGISTRY="${ADW_REGISTRY:-$HOME/.config/ai-tooling/installs}"
