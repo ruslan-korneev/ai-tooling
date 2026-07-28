@@ -26,7 +26,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 
 root="$(adw_repo_root)" || adw_die "not a git repo"
-cd "$root"
+cd "$root" || adw_die "cannot enter the repository root: $root"
 
 print_contract() {
   cat <<'EOF'
@@ -303,7 +303,7 @@ states() { # show how intents resolve against this tracker — diagnostic, write
   local ref="${1:-}"
   [[ -n "$(adw_cfg INTAKE_STATES_CMD)" ]] || adw_die "no INTAKE_STATES_CMD in .tasks/_STACK.md"
   local intent
-  for intent in start review done; do
+  for intent in start review 'done'; do   # quoted: bare `done` reads as the loop keyword
     printf '  %-8s → %s\n' "$intent" "$(resolve_state "$intent" "$ref")"
   done
 }

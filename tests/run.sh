@@ -44,6 +44,7 @@ not covered (needs a remote, gh, or a live engine CLI):
   gate.sh workspace · gate.sh ready · gate.sh committed (upstream branch)
   review.sh fan-out · engines.sh probe/run · intake.sh fetch/writeback
   install.sh: install + upgrade are covered; doctor, uninstall and hook registration are not
+  static analysis: shellcheck runs in CI, not here — this suite needs only bash and git
 NOTE
 
 if (( ${#failed[@]} )); then

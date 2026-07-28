@@ -6,7 +6,7 @@ set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/harness.sh"
 
 # Never touch the operator's real registry.
-export ADW_REGISTRY="$(tmpdir registry)/installs"
+ADW_REGISTRY="$(tmpdir registry)/installs"; export ADW_REGISTRY
 
 target="$(fixture target)" || exit 1
 rm -rf "$target/scripts"                      # this test installs the scripts itself
